@@ -35,31 +35,38 @@ const DEVELOPER = {
   englishName: "Jarson Cai",
   title: "全栈开发工程师 · AI 产品设计师",
   bio: "研究兴趣包括 RAG、Agent、LLM 应用、计算机视觉与参数高效微调。希望通过检索、对话和溯源把资料真正用起来，让 AI 成为可核对、可落地的工作助手。",
-  github: "https://github.com/caixiongjiang",
-  githubHandle: "caixiongjiang",
+  github: "https://github.com/foliaai",
+  githubHandle: "foliaai",
+  personalGithub: "https://github.com/caixiongjiang",
+  personalGithubHandle: "caixiongjiang",
   zhihu: "https://www.zhihu.com/people/cai-xiong-jiang",
 };
 
 const PROJECTS = [
   {
-    name: "AI-site",
+    name: "folio-web",
     desc: "本站前端。知识库问答、文档预览与 bbox 溯源、技能管理。",
-    href: "https://github.com/caixiongjiang/AI-site",
+    href: "https://github.com/foliaai/folio-web",
   },
   {
-    name: "agentic_knowledge_system",
+    name: "folio-aks-server",
     desc: "Agentic 知识库后端：多粒度检索、流式对话、引用与索引管线。",
-    href: "https://github.com/caixiongjiang/agentic_knowledge_system",
+    href: "https://github.com/foliaai/folio-aks-server",
   },
   {
-    name: "skill-service",
+    name: "folio-agent-server",
+    desc: "智能体应用平台：会议纪要合规检查等 Agent 应用，与文档解析、文件存储公共服务。",
+    href: "https://github.com/foliaai/folio-agent-server",
+  },
+  {
+    name: "folio-skill-server",
     desc: "技能管理独立服务：技能 CRUD、启停、封面存储，对外提供 REST API。",
-    href: "https://github.com/caixiongjiang/skill_service",
+    href: "https://github.com/foliaai/folio-skill-server",
   },
   {
-    name: "skill-core",
-    desc: "技能系统核心包：解析、注册表、安全扫描与 MySQL 仓储，供 skill-service 与各后端复用。",
-    href: "https://github.com/caixiongjiang/skill_core",
+    name: "folio-skill-core",
+    desc: "技能系统核心包：解析、注册表、安全扫描与 MySQL 仓储，供 folio-skill-server 与各后端复用。",
+    href: "https://github.com/foliaai/folio-skill-core",
   },
 ];
 
@@ -111,7 +118,21 @@ export default function HelpPage() {
               >
                 <span className="inline-flex items-center gap-2">
                   <Github className="h-4 w-4 text-muted" />
-                  GitHub · @{DEVELOPER.githubHandle}
+                  GitHub · @{DEVELOPER.githubHandle}（组织）
+                </span>
+                <ArrowUpRight className="h-3.5 w-3.5 text-muted" />
+              </a>
+            </li>
+            <li>
+              <a
+                href={DEVELOPER.personalGithub}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between rounded-xl border border-gray-200/80 px-3.5 py-2.5 text-sm text-foreground transition-colors hover:border-primary/30 hover:bg-primary/5"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Github className="h-4 w-4 text-muted" />
+                  GitHub · @{DEVELOPER.personalGithubHandle}（个人）
                 </span>
                 <ArrowUpRight className="h-3.5 w-3.5 text-muted" />
               </a>

@@ -17,7 +17,7 @@
 
 # 📑 Introduction
 
-`AI-site` 是 [agentic_knowledge_system](https://github.com/JarsonCai/agentic_knowledge_system)（AKS）的 Web 前端，把后端的多粒度检索、Agentic 对话与 bbox 溯源能力以可视化方式呈现出来：在一个三栏式工作区里，左侧管理知识库 / 文件夹 / 文件，中间用 `react-pdf` 渲染文档（原生 PDF 与 Word/PPT 转换 PDF），右侧与知识库对话，回答带引用 chip，点击即可在 PDF 上**按 MinerU 坐标叠加高亮框**并跳转到对应页。
+`AI-site` 是 [agentic_knowledge_system](https://github.com/foliaai/folio-aks-server)（AKS）的 Web 前端，把后端的多粒度检索、Agentic 对话与 bbox 溯源能力以可视化方式呈现出来：在一个三栏式工作区里，左侧管理知识库 / 文件夹 / 文件，中间用 `react-pdf` 渲染文档（原生 PDF 与 Word/PPT 转换 PDF），右侧与知识库对话，回答带引用 chip，点击即可在 PDF 上**按 MinerU 坐标叠加高亮框**并跳转到对应页。
 
 当前已落地：**知识库管理、文件上传与索引、文档预览与 bbox 溯源、知识库对话、技能管理**。首页与 Agent 应用中心为锁定状态（敬请期待）。
 
@@ -30,7 +30,7 @@
 - **bbox 源溯源**：对话引用 → `chunk/{id}/position` 取元素 bbox → 按 0~1000 归一化坐标在对应页 canvas 上叠加高亮框，并自动跳页。
 - **流式对话**：WebSocket 流式输出，支持工具调用、引用、图片 chunk 预览、Markdown + KaTeX 渲染；带 `@文件` 提及与召回流程图。
 - **技能管理**：技能列表 / 详情 / 编辑器，对话中通过 `@skill` 调用。
-- **Logto 认证**：PKCE 流程，`RequireAuth` 路由守卫，回调页处理。
+- **可切换登录**：`NEXT_PUBLIC_AUTH_PROVIDER` 选择 Logto（公网 PKCE）或企业 OA（内部授权码），同一份代码、不同部署配置。
 - **设计系统**：Tailwind，主色 `#00B36B → #00D980`，系统字体栈，Lucide 图标。
 
 ### 🛠️ Deployment Options
@@ -66,7 +66,8 @@ AI-site/
 │   ├── knowledge-types.ts     # KnowledgeFile / ChunkPositionResponse / FilePreviewResponse …
 │   ├── knowledge-viewer.ts    # isPdfPreviewableFile + 视图缓存
 │   ├── chat/ · actions/ · hooks/
-│   ├── logto.ts · auth.ts · config.ts
+│   ├── auth-providers/        # 登录方式抽象：logto.ts（公网）/ oa.ts（内部 OA）
+│   ├── auth.ts · config.ts
 ├── next.config.mjs             # /skill-api → Skill Service 反向代理
 ├── tailwind.config.ts
 └── package.json
@@ -113,7 +114,15 @@ NEXT_PUBLIC_API_URL=http://localhost:8000     # AKS 后端
 NEXT_PUBLIC_API_VERSION=api/v1                # API 版本前缀
 NEXT_PUBLIC_MOCK_USER_ID=user_demo_001         # 未登录时的 mock 用户
 
-# Logto（认证）
+# 登录方式：logto（公网，默认）| oa（内部企业 OA）
+NEXT_PUBLIC_AUTH_PROVIDER=logto
+
+# 企业 OA 登录（NEXT_PUBLIC_AUTH_PROVIDER=oa 时使用）
+NEXT_PUBLIC_OA_SSO_AUTHORIZE_URL=https://oasso.jiepei.com/connect/authorize
+NEXT_PUBLIC_OA_AGENT_ID=your_oa_agent_id
+NEXT_PUBLIC_OA_REDIRECT_URI=http://localhost:4000/callback
+
+# Logto（NEXT_PUBLIC_AUTH_PROVIDER=logto 时使用）
 NEXT_PUBLIC_APP_URL=http://localhost:4000
 NEXT_PUBLIC_LOGTO_ENDPOINT=http://localhost:3001
 NEXT_PUBLIC_LOGTO_APP_ID=your_logto_app_id
@@ -141,7 +150,7 @@ npm run build
 npm start
 ```
 
-> 前端依赖 AKS 后端提供数据与转换 PDF；请先启动 [agentic_knowledge_system](https://github.com/JarsonCai/agentic_knowledge_system) 的 API 与 Workers。
+> 前端依赖 AKS 后端提供数据与转换 PDF；请先启动 [agentic_knowledge_system](https://github.com/foliaai/folio-aks-server) 的 API 与 Workers。
 
 ---
 
@@ -164,7 +173,7 @@ npm start
 | 图标 | Lucide React |
 | PDF | react-pdf（PDF.js） |
 | Markdown | react-markdown · remark-gfm · remark-math · rehype-katex |
-| 认证 | Logto（PKCE） |
+| 认证 | Logto（PKCE，公网）/ 企业 OA（授权码，内部） |
 | 后端 | agentic_knowledge_system（FastAPI :8000） |
 | 通信 | REST + WebSocket（流式对话） |
 

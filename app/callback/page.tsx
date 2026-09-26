@@ -1,32 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { handleLogtoCallback } from "@/lib/logto";
+import { getAuthProvider, getAuthProviderLabel } from "@/lib/auth-providers";
 
 export default function CallbackPage() {
   const router = useRouter();
   const { completeLogin } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
+  // 授权码一次性、PKCE state 全页仅一份：回调必须整页只处理一次，
+  // StrictMode 双执行与 completeLogin 引用变化都不得重入。
+  const handledRef = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    if (handledRef.current) return;
+    handledRef.current = true;
 
     const run = async () => {
       try {
-        const { session, nextPath } = await handleLogtoCallback(
+        const { session, nextPath } = await getAuthProvider().handleCallback(
           new URLSearchParams(window.location.search)
         );
-
-        if (cancelled) return;
 
         completeLogin(session);
         router.replace(nextPath);
       } catch (callbackError) {
-        if (cancelled) return;
-
         setError(
           callbackError instanceof Error
             ? callbackError.message
@@ -36,11 +37,9 @@ export default function CallbackPage() {
     };
 
     void run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [completeLogin, router]);
+    // 依赖必须为空，否则 completeLogin 引用变化会触发重入（见 handledRef 注释）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
@@ -63,7 +62,7 @@ export default function CallbackPage() {
             <LoaderCircle className="mx-auto h-10 w-10 animate-spin text-primary" />
             <h1 className="mt-4 text-2xl font-bold text-foreground">正在完成登录</h1>
             <p className="mt-3 text-sm leading-6 text-muted">
-              正在与 Logto 交换令牌并恢复你的登录态，请稍候。
+              正在与 {getAuthProviderLabel()} 交换令牌并恢复你的登录态，请稍候。
             </p>
           </>
         )}

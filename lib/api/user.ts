@@ -1,12 +1,16 @@
 /**
  * 用户个人资料与头像相关 API 客户端
+ *
+ * 资料读写走 folio-auth-server（/auth-api rewrite）；
+ * 头像上传/删除暂仍走 AKS（依赖 MinIO 存储服务，待其迁入 auth-server 后切换）。
  */
 
-import { API_CONFIG, getCommonHeaders, getCurrentUserId } from "@/lib/config";
+import { API_CONFIG, authApiUrl, getCommonHeaders } from "@/lib/config";
 
 export interface UserProfileData {
   user_id: string;
   nickname?: string | null;
+  role?: string | null;
   avatar_url?: string | null;
   bio?: string | null;
   custom_data?: Record<string, any> | null;
@@ -37,11 +41,11 @@ function buildUserUrl(path: string): string {
 }
 
 /**
- * 获取当前登录用户的个人资料与头像配置
+ * 获取当前登录用户的个人资料与头像配置（folio-auth-server）
  */
 export async function getUserProfile(): Promise<UserProfileData | null> {
   try {
-    const url = buildUserUrl("/api/user/profile");
+    const url = authApiUrl("/user/profile");
     const headers = getCommonHeaders();
 
     const res = await fetch(url, {
@@ -63,14 +67,14 @@ export async function getUserProfile(): Promise<UserProfileData | null> {
 }
 
 /**
- * 更新用户个人资料（昵称、个人简介等）
+ * 更新用户个人资料（昵称、个人简介等，folio-auth-server）
  */
 export async function updateUserProfile(payload: {
   nickname?: string | null;
   bio?: string | null;
   custom_data?: Record<string, any> | null;
 }): Promise<UserProfileData | null> {
-  const url = buildUserUrl("/api/user/profile");
+  const url = authApiUrl("/user/profile");
   const headers = getCommonHeaders();
 
   const res = await fetch(url, {
@@ -90,6 +94,7 @@ export async function updateUserProfile(payload: {
 
 /**
  * 上传自定义头像图片至 MinIO
+ * 暂走 AKS（头像存储服务未迁入 auth-server，迁移后改 authApiUrl("/user/avatar")）
  */
 export async function uploadUserAvatar(file: File): Promise<string> {
   const url = buildUserUrl("/api/user/avatar");
@@ -124,6 +129,7 @@ export async function uploadUserAvatar(file: File): Promise<string> {
 
 /**
  * 删除自定义头像（重置为默认 Identicon）
+ * 暂走 AKS（同上，头像存储迁移后切换）
  */
 export async function deleteUserAvatar(): Promise<void> {
   const url = buildUserUrl("/api/user/avatar");
