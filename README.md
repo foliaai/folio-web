@@ -17,7 +17,7 @@
 
 # 📑 Introduction
 
-`AI-site` 是 [agentic_knowledge_system](https://github.com/JarsonCai/agentic_knowledge_system)（AKS）的 Web 前端，把后端的多粒度检索、Agentic 对话与 bbox 溯源能力以可视化方式呈现出来：在一个三栏式工作区里，左侧管理知识库 / 文件夹 / 文件，中间用 `react-pdf` 渲染文档（原生 PDF 与 Word/PPT 转换 PDF），右侧与知识库对话，回答带引用 chip，点击即可在 PDF 上**按 MinerU 坐标叠加高亮框**并跳转到对应页。
+`AI-site` 是 [agentic_knowledge_system](https://github.com/foliaai/folio-aks-server)（AKS）的 Web 前端，把后端的多粒度检索、Agentic 对话与 bbox 溯源能力以可视化方式呈现出来：在一个三栏式工作区里，左侧管理知识库 / 文件夹 / 文件，中间用 `react-pdf` 渲染文档（原生 PDF 与 Word/PPT 转换 PDF），右侧与知识库对话，回答带引用 chip，点击即可在 PDF 上**按 MinerU 坐标叠加高亮框**并跳转到对应页。
 
 当前已落地：**知识库管理、文件上传与索引、文档预览与 bbox 溯源、知识库对话、技能管理**。首页与 Agent 应用中心为锁定状态（敬请期待）。
 
@@ -150,7 +150,7 @@ npm run build
 npm start
 ```
 
-> 前端依赖 AKS 后端提供数据与转换 PDF；请先启动 [agentic_knowledge_system](https://github.com/JarsonCai/agentic_knowledge_system) 的 API 与 Workers。
+> 前端依赖 AKS 后端提供数据与转换 PDF；请先启动 [agentic_knowledge_system](https://github.com/foliaai/folio-aks-server) 的 API 与 Workers。
 
 ---
 
