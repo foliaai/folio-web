@@ -85,11 +85,11 @@ jobs:
             
             # 5. 重启 PM2 应用（不停机更新）
             echo "🔄 重启应用..."
-            pm2 reload ai-site --update-env || pm2 restart ai-site || { echo "❌ 错误：PM2 重启失败"; exit 1; }
+            pm2 reload folio-web --update-env || pm2 restart folio-web || { echo "❌ 错误：PM2 重启失败"; exit 1; }
             
             # 6. 显示应用状态
             echo "📊 当前应用状态："
-            pm2 status ai-site
+            pm2 status folio-web
             
             echo "========================================="
             echo "✅ 部署完成！网站已更新！"
