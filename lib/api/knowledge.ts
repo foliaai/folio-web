@@ -1,4 +1,4 @@
-import { API_CONFIG, getCommonHeaders, getCurrentUserId } from "@/lib/config";
+import { API_CONFIG, getCommonHeaders, getQueryAuthToken } from "@/lib/config";
 import {
   ApiResponse,
   ChunkImagePreviewResponse,
@@ -517,7 +517,7 @@ export async function fetchFilePreview(
  */
 export function buildFileRawUrl(fileId: string): string {
   const base = buildKnowledgeUrl(`/api/knowledge/file/${encodeURIComponent(fileId)}/raw`);
-  const token = encodeURIComponent(getCurrentUserId());
+  const token = encodeURIComponent(getQueryAuthToken());
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}token=${token}`;
 }
@@ -546,7 +546,7 @@ export function buildChunkImageRawUrl(chunkId: string): string {
   const base = buildKnowledgeUrl(
     `/api/knowledge/chunk/${encodeURIComponent(chunkId)}/raw-image`
   );
-  const token = encodeURIComponent(getCurrentUserId());
+  const token = encodeURIComponent(getQueryAuthToken());
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}token=${token}`;
 }

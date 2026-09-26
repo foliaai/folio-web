@@ -10,7 +10,10 @@ RUN npm config set registry https://registry.npmmirror.com \
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-COPY .env.jp .env.production
+# NEXT_PUBLIC_* 变量在构建期内联，不同部署通过 build arg 指定各自的 env 文件
+# 默认 .env.jp（内部部署，OA 登录）；公网部署传 --build-arg APP_ENV_FILE=.env.production
+ARG APP_ENV_FILE=.env.jp
+COPY ${APP_ENV_FILE} .env.production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -9,6 +9,7 @@ import {
 import { LockKeyhole, Sparkles, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { getAuthProviderLabel } from "@/lib/auth-providers";
 
 interface AuthModalOptions {
   title: string;
@@ -112,7 +113,9 @@ export function AuthModalProvider({
                   disabled={!isReady || isSubmitting}
                   className="flex w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSubmitting ? "正在跳转到 Logto..." : "登录 / 注册后继续"}
+                  {isSubmitting
+                    ? `正在跳转到 ${getAuthProviderLabel()}...`
+                    : "登录 / 注册后继续"}
                 </button>
 
                 <button

@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: AKS 知识库后端问题
-    url: https://github.com/caixiongjiang/agentic_knowledge_system/issues/new/choose
+    url: https://github.com/foliaai/folio-aks-server/issues/new/choose
     about: 检索、索引、对话接口、溯源数据等后端问题请到 AKS 提
   - name: skill_service 技能服务问题
-    url: https://github.com/caixiongjiang/skill_service/issues/new/choose
+    url: https://github.com/foliaai/folio-skill-server/issues/new/choose
     about: 技能 CRUD、descriptors、技能服务本身的问题请到 skill_service 提

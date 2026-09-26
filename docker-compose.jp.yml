@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_ENV_FILE: .env.jp
     container_name: ai-site-jp
     restart: unless-stopped
     ports:
