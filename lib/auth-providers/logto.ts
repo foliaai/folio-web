@@ -1,11 +1,26 @@
+/**
+ * Logto 登录 Provider（公网部署，NEXT_PUBLIC_AUTH_PROVIDER=logto）
+ *
+ * 流程（授权码 + PKCE，token 交换全部在服务端）：
+ * 1. startSignIn: 生成 PKCE 并 302 跳转 Logto 授权页（code_challenge=S256）
+ * 2. Logto 回调 redirect_uri?code=CODE&state=STATE
+ * 3. handleCallback: 校验 state 后，把 code + code_verifier 交给
+ *    folio-auth-server（POST /auth-api/auth/logto/login），由服务端完成：
+ *      - Logto token 端点换 id_token / access_token（前端不经手）
+ *      - id_token 验签 + userinfo 拉取（权威身份）
+ *      - 换发本域 RS256 JWT 返回前端
+ * 4. 前端仅持有本域 JWT，后续请求统一 Authorization: Bearer <本域JWT>
+ *
+ * 安全收益：修复此前"前端直接持有 Logto access_token 充当本域凭证 +
+ * 后端裸信 X-User-Id"的透传漏洞。
+ */
 import { AuthSession, AuthUser } from "@/lib/auth";
+import { authApiUrl } from "@/lib/config";
 import { AuthCallbackResult, AuthProviderClient } from "./types";
 
 interface OpenIdConfiguration {
   authorization_endpoint: string;
-  token_endpoint: string;
   end_session_endpoint?: string;
-  userinfo_endpoint?: string;
   issuer: string;
 }
 
@@ -15,13 +30,29 @@ interface PkceState {
   nextPath: string;
 }
 
-interface TokenResponse {
+/** folio-auth-server /api/auth/logto/login 返回的用户信息 */
+interface LoginUserData {
+  user_id: string;
+  name?: string | null;
+  role?: string | null;
+  employee_no?: string | null;
+  employee_id?: number | null;
+  alias_name?: string | null;
+  email?: string | null;
+  avatar?: string | null;
+}
+
+interface LoginResponseData {
   access_token: string;
-  id_token?: string;
-  refresh_token?: string;
-  scope?: string;
-  expires_in?: number;
   token_type?: string;
+  expires_in?: number;
+  user: LoginUserData;
+}
+
+interface LoginResponse {
+  code?: number;
+  message?: string;
+  data?: LoginResponseData;
 }
 
 const PKCE_STORAGE_KEY = "ai_site_logto_pkce";
@@ -74,45 +105,20 @@ function getResource(): string | null {
   return process.env.NEXT_PUBLIC_LOGTO_RESOURCE || null;
 }
 
-function decodeBase64Url(input: string): string {
-  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-
-  if (typeof atob === "function") {
-    return atob(padded);
-  }
-
-  throw new Error("当前环境不支持 atob");
-}
-
-function parseJwtPayload(token?: string): Record<string, any> | null {
-  if (!token) return null;
-
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-
-  try {
-    return JSON.parse(decodeBase64Url(parts[1])) as Record<string, any>;
-  } catch {
-    return null;
-  }
-}
-
-function toAuthUser(payload?: Record<string, any> | null): AuthUser | null {
-  if (!payload) return null;
+function toAuthUser(data: LoginUserData): AuthUser {
+  const displayName = data.name || data.email || data.user_id;
 
   return {
-    id: payload.sub,
-    user_id: payload.sub,
-    sub: payload.sub,
-    name: payload.name,
-    given_name: payload.given_name,
-    family_name: payload.family_name,
-    username: payload.username,
-    preferred_username: payload.preferred_username,
-    email: payload.email,
-    avatar: payload.picture,
-    picture: payload.picture,
+    id: data.user_id,
+    user_id: data.user_id,
+    sub: data.user_id,
+    name: displayName,
+    username: data.user_id,
+    preferred_username: displayName,
+    email: data.email || undefined,
+    avatar: data.avatar || undefined,
+    picture: data.avatar || undefined,
+    role: data.role || "user",
   };
 }
 
@@ -130,7 +136,7 @@ function toBase64Url(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(byte);
   });
 
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 async function sha256Digest(input: string): Promise<ArrayBuffer> {
@@ -168,7 +174,6 @@ function sha256Fallback(message: Uint8Array): ArrayBuffer {
   withPad[message.length] = 0x80;
   const view = new DataView(withPad.buffer);
   view.setUint32(withPad.length - 4, bitLen >>> 0);
-
   let h0 = 0x6a09e667;
   let h1 = 0xbb67ae85;
   let h2 = 0x3c6ef372;
@@ -273,26 +278,53 @@ function clearPkceState(): void {
   sessionStorage.removeItem(PKCE_STORAGE_KEY);
 }
 
-async function fetchUserInfo(
-  config: OpenIdConfiguration,
-  accessToken: string
-): Promise<AuthUser | null> {
-  if (!config.userinfo_endpoint) {
-    return null;
+/**
+ * 把授权码交给 folio-auth-server 换发本域 JWT。
+ * code / code_verifier 均一次性，Logto 的 token 只在服务端短暂存在。
+ */
+async function requestLogin(
+  code: string,
+  codeVerifier: string
+): Promise<AuthSession> {
+  let response: Response;
+
+  try {
+    response = await fetch(authApiUrl("/auth/logto/login"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code,
+        redirect_uri: getRedirectUri(),
+        code_verifier: codeVerifier,
+      }),
+    });
+  } catch {
+    throw new Error("登录请求失败，请检查认证服务后重试");
   }
 
-  const response = await fetch(config.userinfo_endpoint, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const payload = (await response.json().catch(() => null)) as
+    | (LoginResponse & { detail?: string })
+    | null;
 
-  if (!response.ok) {
-    return null;
+  if (!response.ok || !payload?.data?.access_token) {
+    // 服务端错误可能是 ApiResponse.message，也可能是 FastAPI 的 detail
+    throw new Error(
+      payload?.message ||
+        payload?.detail ||
+        `Logto 登录失败 (HTTP ${response.status})，请重新发起登录`
+    );
   }
 
-  const payload = (await response.json()) as Record<string, any>;
-  return toAuthUser(payload);
+  const data = payload.data;
+
+  return {
+    accessToken: data.access_token,
+    scope: data.token_type || "bearer",
+    expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
+    user: toAuthUser(data.user),
+  };
 }
 
 export async function startLogtoSignIn(nextPath = "/"): Promise<void> {
@@ -352,50 +384,7 @@ export async function handleLogtoCallback(search: URLSearchParams): Promise<{
     throw new Error("登录状态校验失败，请重新登录");
   }
 
-  const config = await getOpenIdConfiguration();
-  const tokenRequest = new URLSearchParams({
-    grant_type: "authorization_code",
-    client_id: getClientId(),
-    code,
-    redirect_uri: getRedirectUri(),
-    code_verifier: pkceState.codeVerifier,
-  });
-
-  const resource = getResource();
-  if (resource) {
-    tokenRequest.set("resource", resource);
-  }
-
-  const response = await fetch(config.token_endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: tokenRequest.toString(),
-  });
-
-  const payload = (await response.json().catch(() => null)) as TokenResponse | null;
-  if (!response.ok || !payload?.access_token) {
-    throw new Error("Logto token 交换失败");
-  }
-
-  const idTokenPayload = parseJwtPayload(payload.id_token);
-  const accessTokenPayload = parseJwtPayload(payload.access_token);
-  const user =
-    (await fetchUserInfo(config, payload.access_token)) ||
-    toAuthUser(idTokenPayload) ||
-    toAuthUser(accessTokenPayload);
-
-  const session: AuthSession = {
-    accessToken: payload.access_token,
-    idToken: payload.id_token,
-    refreshToken: payload.refresh_token,
-    scope: payload.scope,
-    expiresAt: payload.expires_in
-      ? Date.now() + payload.expires_in * 1000
-      : undefined,
-    user,
-  };
+  const session = await requestLogin(code, pkceState.codeVerifier);
 
   clearPkceState();
 
@@ -406,6 +395,9 @@ export async function handleLogtoCallback(search: URLSearchParams): Promise<{
 }
 
 export async function buildLogtoLogoutUrl(idToken?: string): Promise<string> {
+  // 本域会话已由前端清除；这里仅结束 Logto 侧会话。
+  // 换发本域 JWT 后前端不再持有 Logto id_token，无法带 id_token_hint，
+  // Logto 会在缺少 hint 时展示确认页后完成登出。
   const config = await getOpenIdConfiguration();
   const url = new URL(
     config.end_session_endpoint || `${getEndpoint()}/oidc/session/end`

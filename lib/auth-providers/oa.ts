@@ -10,7 +10,7 @@
  *    由后端完成 code 换用户信息并签发本域 JWT，前端仅持有最终 JWT
  */
 import { AuthSession, AuthUser } from "@/lib/auth";
-import { API_CONFIG } from "@/lib/config";
+import { authApiUrl } from "@/lib/config";
 import { AuthCallbackResult, AuthProviderClient } from "./types";
 
 interface OALoginUserData {
@@ -19,6 +19,7 @@ interface OALoginUserData {
   employee_id?: number | null;
   name?: string | null;
   alias_name?: string | null;
+  role?: string | null;
 }
 
 interface OALoginResponseData {
@@ -60,6 +61,21 @@ function getAuthorizeEndpoint(): string {
   );
 }
 
+/**
+ * OA 中台单点登出端点（可选）。
+ * 作用：登出时清掉浏览器里 .jiepei.com 域的 WuJiAppAuthbtns 会话，
+ * 使得"主动登出 → 下次登录必须重新扫码"成立。
+ * 现状：中台暂未提供该端点（oasso/无极均无可发现的 logout 路径），
+ * 留空时登出仅清本域会话，下次登录会被 OA 静默授权免扫码恢复。
+ */
+function getSsoLogoutUrl(): string | null {
+  return process.env.NEXT_PUBLIC_OA_SSO_LOGOUT_URL || null;
+}
+
+function getPostLogoutRedirectUri(): string {
+  return `${getBaseUrl()}/login`;
+}
+
 function getAgentId(): string {
   const agentId = process.env.NEXT_PUBLIC_OA_AGENT_ID;
 
@@ -71,8 +87,8 @@ function getAgentId(): string {
 }
 
 function getLoginEndpoint(): string {
-  const base = API_CONFIG.BASE_URL.replace(/\/+$/, "");
-  return `${base}/api/auth/oa/login`;
+  // 登录走 folio-auth-server（Next.js rewrite 同源转发，无 CORS）
+  return authApiUrl("/auth/oa/login");
 }
 
 function randomString(length = 48): string {
@@ -110,6 +126,7 @@ function toAuthUser(data: OALoginUserData): AuthUser {
     name: displayName,
     username: data.employee_no || data.user_id,
     preferred_username: data.employee_no || undefined,
+    role: data.role || "user",
   };
 }
 
@@ -128,10 +145,17 @@ async function requestLogin(code: string): Promise<AuthSession> {
     throw new Error("OA 登录请求失败，请检查网络后重试");
   }
 
-  const payload = (await response.json().catch(() => null)) as OALoginResponse | null;
+  const payload = (await response.json().catch(() => null)) as
+    | (OALoginResponse & { detail?: string })
+    | null;
 
   if (!response.ok || !payload?.data?.access_token) {
-    throw new Error(payload?.message || "OA 登录失败，请重新发起登录");
+    // 服务端错误可能是 ApiResponse.message，也可能是 FastAPI 的 detail
+    throw new Error(
+      payload?.message ||
+        payload?.detail ||
+        `OA 登录失败 (HTTP ${response.status})，请重新发起登录`
+    );
   }
 
   const data = payload.data;
@@ -198,7 +222,16 @@ export const oaAuthProvider: AuthProviderClient = {
   },
 
   async buildLogoutUrl(): Promise<string> {
-    // OA snsapi_base 为静默授权，本地清除会话后重新登录即可无感恢复登录态
+    // 配置了中台登出端点 → 跳过去清 OA 会话后回到 /login（重新登录需扫码）
+    const logoutUrl = getSsoLogoutUrl();
+    if (logoutUrl) {
+      const url = new URL(logoutUrl);
+      // 参数名沿用中台 authorize 的 redirect_url 约定；中台若用别的名字按其文档调整
+      url.searchParams.set("redirect_url", getPostLogoutRedirectUri());
+      return url.toString();
+    }
+    // 未配置：仅清本域会话。OA snsapi_base 静默授权会保留，
+    // 下次登录免扫码恢复（配合 AuthProvider 的登出标记，不会被自动弹回）
     return "/login";
   },
 };
