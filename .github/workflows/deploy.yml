@@ -69,7 +69,7 @@ jobs:
             
             # 1. 进入项目目录
             echo "📂 进入项目目录..."
-            cd /var/www/ai-site || { echo "❌ 错误：项目目录不存在"; exit 1; }
+            cd /var/www/folio-web || { echo "❌ 错误：项目目录不存在"; exit 1; }
             
             # 2. 拉取最新代码
             echo "📥 拉取最新代码..."
