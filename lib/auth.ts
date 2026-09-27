@@ -25,8 +25,6 @@ export interface AuthSession {
 
 const TOKEN_STORAGE_KEY =
   process.env.NEXT_PUBLIC_AUTH_TOKEN_STORAGE_KEY || "ai_site_auth_token";
-const USER_STORAGE_KEY =
-  process.env.NEXT_PUBLIC_AUTH_USER_STORAGE_KEY || "ai_site_auth_user";
 const SESSION_STORAGE_KEY =
   process.env.NEXT_PUBLIC_AUTH_SESSION_STORAGE_KEY || "ai_site_auth_session";
 const COOKIE_NAME =
@@ -65,35 +63,11 @@ export function getAuthSession(): AuthSession | null {
   }
 }
 
-export function getAuthUser(): AuthUser | null {
-  const session = getAuthSession();
-  if (session?.user) {
-    return session.user;
-  }
-
-  if (!isBrowser()) return null;
-
-  const raw = localStorage.getItem(USER_STORAGE_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-}
-
 export function setAuthSession(session: AuthSession): void {
   if (!isBrowser()) return;
 
   localStorage.setItem(TOKEN_STORAGE_KEY, session.accessToken);
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-
-  if (session.user) {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(session.user));
-  } else {
-    localStorage.removeItem(USER_STORAGE_KEY);
-  }
 
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(
     session.accessToken
@@ -104,7 +78,6 @@ export function clearAuthSession(): void {
   if (!isBrowser()) return;
 
   localStorage.removeItem(TOKEN_STORAGE_KEY);
-  localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(SESSION_STORAGE_KEY);
   document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; samesite=lax`;
 }

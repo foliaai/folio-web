@@ -12,7 +12,6 @@ import {
   RotateCcw,
   ShieldCheck,
   LogOut,
-  LogIn,
   RefreshCw,
   Trash2,
   Download,
@@ -32,7 +31,6 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { RequireAuth } from "@/components/auth/RequireAuth";
-import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import {
   fetchChatModels,
   groupChatModelsByProvider,
@@ -59,7 +57,6 @@ type TabType = "profile" | "ai" | "data" | "system";
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const { isAuthenticated, user, logout } = useAuth();
-  const { openAuthModal } = useAuthModal();
   const {
     userId,
     profile,
@@ -649,7 +646,7 @@ export default function SettingsPage() {
                   <div>
                     <h3 className="text-xs font-bold text-foreground">会话与认证管理</h3>
                     <p className="mt-0.5 text-xs text-muted">
-                      {isAuthenticated ? "当前已登录，退出后将清除本地会话缓存并重定向至登录页。" : "登录后可开启云端跨设备同步、专属知识库存储及 Agent 编排。"}
+                      "当前已登录，退出后将清除本地会话缓存并重定向至登录页。"
                     </p>
                   </div>
                   {isAuthenticated ? (
@@ -661,16 +658,7 @@ export default function SettingsPage() {
                       <LogOut className="h-3.5 w-3.5" />
                       <span>退出登录</span>
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openAuthModal({ title: "登录账号", description: "登录后即可同步全部知识库与对话。" })}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-white shadow-xs hover:bg-primary-light transition-colors"
-                    >
-                      <LogIn className="h-3.5 w-3.5" />
-                      <span>立即登录</span>
-                    </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}

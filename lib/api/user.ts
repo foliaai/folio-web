@@ -102,9 +102,6 @@ export async function uploadUserAvatar(file: File): Promise<string> {
   
   // 必须使用 FormData，且不能显式设置 Content-Type 让浏览器自动设置 multipart boundary
   const headers: Record<string, string> = {};
-  if (defaultHeaders["X-User-Id"]) {
-    headers["X-User-Id"] = defaultHeaders["X-User-Id"];
-  }
   if (defaultHeaders.Authorization) {
     headers.Authorization = defaultHeaders.Authorization;
   }

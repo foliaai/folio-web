@@ -8,7 +8,6 @@ import {
   getAuthSession,
   setAuthSession,
 } from "@/lib/auth";
-import { migrateGuestHomeConversations } from "@/lib/home-chat";
 import { getAuthProvider } from "@/lib/auth-providers";
 
 interface AuthContextValue {
@@ -49,9 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await getAuthProvider().startSignIn(nextPath);
       },
       completeLogin: (nextSession: AuthSession) => {
-        migrateGuestHomeConversations(
-          nextSession.user?.id || nextSession.user?.user_id || nextSession.user?.sub
-        );
         setAuthSession(nextSession);
         setSession(nextSession);
         setToken(nextSession.accessToken);

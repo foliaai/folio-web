@@ -69,7 +69,7 @@ function extractDisplayChar(name?: string | null, userId?: string | null): strin
 
   const rawId = userId?.trim() || "";
   if (rawId) {
-    // 若为 user_demo_001 等常见格式，去掉 user_ 前缀取特征字母
+    // user_ 前缀的旧格式用户 ID，去掉前缀取特征字母
     const cleaned = rawId.replace(/^(user|sub|account)_?/i, "").trim();
     if (cleaned.length > 0) {
       const c = cleaned[0];
