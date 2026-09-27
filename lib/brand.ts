@@ -26,11 +26,19 @@ export interface BrandConfig {
   copyright: string;
   /** 品牌 Logo 图片（public/ 下路径）；留空回退为通用图形图标 */
   logoUrl?: string;
+  /**
+   * Logo 呈现方式：
+   * - chip：白底圆角芯片 + 内边距（适合白底 PNG，如 FoliaAI 组织头像）
+   * - raw ：图片自带完整底色方块，直接裸放（如捷配青绿方标），加细描边提亮
+   */
+  logoStyle?: "chip" | "raw";
+  /** 品牌标语（品牌行下方小字；留空不显示） */
+  slogan?: string;
 }
 
 const JIEPEI_BRAND: BrandConfig = {
   name: "捷配 AI 工作台",
-  headline: ["面向全员的", "AI 能力工作台"],
+  headline: ["面向捷配全员的", "AI 能力工作台"],
   description:
     "知识、技能与 Agent 汇于一个入口：企业知识可沉淀，AI 能力可复用，专属 Agent 可定制。",
   points: [
@@ -42,6 +50,10 @@ const JIEPEI_BRAND: BrandConfig = {
   idpLabel: "捷配 OA",
   trustLine: "会话加密传输，符合企业安全合规要求",
   copyright: "捷配科技 © 2026 · 捷配 AI 工作台",
+  // 无极系统同款方标（青绿 #00989D 自带圆角方块），裸放于深绿面板
+  logoUrl: "/brand/jiepei.png",
+  logoStyle: "raw",
+  slogan: "让产业更高效，让生活更美好！",
 };
 
 const FOLIA_BRAND: BrandConfig = {
@@ -58,8 +70,9 @@ const FOLIA_BRAND: BrandConfig = {
   idpLabel: "Logto",
   trustLine: "登录会话加密传输，保障账号与数据安全",
   copyright: "FoliaAI © 2026",
-  // GitHub 组织头像原图（256px），本地化存放避免外链
+  // GitHub 组织头像原图（256px，白底），本地化存放避免外链
   logoUrl: "/brand/foliaai.png",
+  logoStyle: "chip",
 };
 
 export function getBrandConfig(): BrandConfig {

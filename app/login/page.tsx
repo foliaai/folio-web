@@ -8,21 +8,27 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { getBrandConfig, type BrandConfig } from "@/lib/brand";
 
 /**
- * 品牌标：有 logoUrl 用品牌图（白底芯片，适配深绿底上的白底 PNG），
- * 没有则回退通用图形图标。
+ * 品牌标：有 logoUrl 用品牌图，没有则回退通用图形图标。
+ * - chip：白底圆角芯片 + 内边距（适配白底 PNG，如 FoliaAI 组织头像）
+ * - raw ：图片自带完整底色方块，直接裸放 + 细白描边（适配自带圆角方标，如捷配）
  */
 function BrandMark({ brand, boxClass }: { brand: BrandConfig; boxClass: string }) {
+  const isRaw = brand.logoStyle === "raw";
+  const containerClass = brand.logoUrl
+    ? isRaw
+      ? "ring-1 ring-white/25 shadow-lg"
+      : "bg-white"
+    : "bg-white/15";
+
   return (
     <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden ${
-        brand.logoUrl ? "bg-white" : "bg-white/15"
-      } ${boxClass}`}
+      className={`flex shrink-0 items-center justify-center overflow-hidden ${containerClass} ${boxClass}`}
     >
       {brand.logoUrl ? (
         <img
           src={brand.logoUrl}
           alt=""
-          className="h-full w-full object-contain p-[12%]"
+          className={`h-full w-full object-contain ${isRaw ? "" : "p-[12%]"}`}
         />
       ) : (
         <LayoutGrid className="h-1/2 w-1/2 text-white" />
@@ -78,11 +84,18 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-primary-light/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-primary/50 blur-3xl" />
 
-        <div className="relative flex items-center gap-3">
-          <BrandMark brand={brand} boxClass="h-11 w-11 rounded-xl" />
-          <span className="text-xl font-semibold tracking-wide text-white">
-            {brand.name}
-          </span>
+        <div className="relative">
+          <div className="flex items-center gap-3">
+            <BrandMark brand={brand} boxClass="h-11 w-11 rounded-xl" />
+            <span className="text-xl font-semibold tracking-wide text-white">
+              {brand.name}
+            </span>
+          </div>
+          {brand.slogan && (
+            <p className="mt-2 pl-[3.25rem] text-xs tracking-wider text-white/80">
+              {brand.slogan}
+            </p>
+          )}
         </div>
 
         <div className="relative max-w-xl">
