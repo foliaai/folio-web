@@ -34,11 +34,6 @@ export interface AvatarUploadResponse {
   };
 }
 
-function buildUserUrl(path: string): string {
-  const base = API_CONFIG.BASE_URL.replace(/\/+$/, "");
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
-}
 
 /**
  * 获取当前登录用户的个人资料与头像配置（folio-auth-server）
@@ -93,11 +88,10 @@ export async function updateUserProfile(payload: {
 }
 
 /**
- * 上传自定义头像图片至 MinIO
- * 暂走 AKS（头像存储服务未迁入 auth-server，迁移后改 authApiUrl("/user/avatar")）
+ * 上传自定义头像（folio-auth-server：MinIO + avatar_url）
  */
 export async function uploadUserAvatar(file: File): Promise<string> {
-  const url = buildUserUrl("/api/user/avatar");
+  const url = authApiUrl("/user/avatar");
   const defaultHeaders = getCommonHeaders();
   
   // 必须使用 FormData，且不能显式设置 Content-Type 让浏览器自动设置 multipart boundary
@@ -126,10 +120,9 @@ export async function uploadUserAvatar(file: File): Promise<string> {
 
 /**
  * 删除自定义头像（重置为默认 Identicon）
- * 暂走 AKS（同上，头像存储迁移后切换）
  */
 export async function deleteUserAvatar(): Promise<void> {
-  const url = buildUserUrl("/api/user/avatar");
+  const url = authApiUrl("/user/avatar");
   const headers = getCommonHeaders();
 
   const res = await fetch(url, {
