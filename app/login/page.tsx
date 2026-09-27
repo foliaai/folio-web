@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LayoutGrid, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getAuthProviderName } from "@/lib/auth-providers";
 import { getBrandConfig, type BrandConfig } from "@/lib/brand";
 
 /**
@@ -142,22 +141,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {getAuthProviderName() === "oa" &&
-              !process.env.NEXT_PUBLIC_OA_SSO_LOGOUT_URL && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-700">
-                  <p className="font-medium">更换账号登录？</p>
-                  <p className="mt-1">
-                    OA
-                    授权状态由浏览器保留，直接点击登录会免扫码恢复为原账号。换人请任选其一：
-                  </p>
-                  <p className="mt-1">
-                    ① 用无痕窗口打开本系统，扫码即新账号； ② 按 F12 → 应用 →
-                    Cookie，删除 jiepei.com 下的 WuJiAppAuthbtns
-                    后再点登录； ③ 先在无极 OA 中退出登录。
-                  </p>
-                </div>
-              )}
-
             <button
               type="button"
               onClick={handleLogin}
@@ -173,7 +156,7 @@ export default function LoginPage() {
             </button>
 
             <p className="text-center text-xs text-muted-subtle">
-              会话加密传输，符合企业安全合规要求
+              {brand.trustLine}
             </p>
           </div>
 
@@ -183,28 +166,13 @@ export default function LoginPage() {
             登录即表示同意
             <span className="font-medium text-foreground">使用规范</span> 与
             <span className="font-medium text-foreground">隐私政策</span>
-            。如需帮助
-            {brand.supportEmail ? (
-              <>
-                请联系 IT 支持：
-                <a
-                  href={`mailto:${brand.supportEmail}`}
-                  className="font-medium text-primary-deep underline-offset-2 hover:underline"
-                >
-                  {brand.supportEmail}
-                </a>
-              </>
-            ) : (
-              <>
-                请查看
-                <Link
-                  href="/help"
-                  className="font-medium text-primary-deep underline-offset-2 hover:underline"
-                >
-                  帮助中心
-                </Link>
-              </>
-            )}
+            。如需帮助请查看
+            <Link
+              href="/help"
+              className="font-medium text-primary-deep underline-offset-2 hover:underline"
+            >
+              帮助中心
+            </Link>
             。
           </p>
         </div>

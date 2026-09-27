@@ -2,7 +2,7 @@
  * 部署品牌配置
  *
  * 同一份代码两处部署，品牌随 AUTH_PROVIDER 走：
- * - oa   → 企业内网部署（捷配 192.168.19.x，捷配 OA 登录）：捷配品牌
+ * - oa   → 企业内网部署（捷配 192.168.19.x，捷配 OA 登录）：捷配白标品牌
  * - logto → 公网部署（hijarson.com，自建 Logto）：FoliaAI 品牌
  *
  * 样式共用，仅文案不同；新增品牌相关文案一律加到这里，不要写死在页面里。
@@ -16,46 +16,48 @@ export interface BrandConfig {
   headline: [string, string];
   /** 一句话产品定位 */
   description: string;
-  /** 左侧卖点列表 */
+  /** 左侧卖点列表（能力名 + 简述；未上线的标注「规划中」） */
   points: string[];
-  /** 登录身份源名称（按钮与欢迎语用，覆盖通用 provider label） */
+  /** 登录身份源名称（按钮与欢迎语用） */
   idpLabel: string;
+  /** 按钮下方信任行 */
+  trustLine: string;
   /** 左下角版权行 */
   copyright: string;
-  /** IT 支持邮箱（企业内网部署配置）；公网部署留空，落版改用帮助中心链接 */
-  supportEmail?: string;
   /** 品牌 Logo 图片（public/ 下路径）；留空回退为通用图形图标 */
   logoUrl?: string;
 }
 
 const JIEPEI_BRAND: BrandConfig = {
-  name: "捷配 AI Studio",
-  headline: ["企业级", "AI 使用底座"],
-  description: "统一入口、可管控、可审计的内部 AI 使用平台，保障数据安全合规。",
+  name: "捷配 AI 工作台",
+  headline: ["面向全员的", "AI 能力工作台"],
+  description:
+    "知识、技能与 Agent 汇于一个入口：企业知识可沉淀，AI 能力可复用，专属 Agent 可定制。",
   points: [
-    "OA 账号统一登录，无需注册",
-    "RBAC 权限控制，角色化模型授权",
-    "共享配额账本，Chat 与 API 统一治理",
-    "全链路审计日志，安全合规可追溯",
+    "知识库：上传文档建立索引，围绕私有资料检索与问答",
+    "技能中心：开箱即用的 AI 能力单元，持续沉淀复用",
+    "定制 Agent（规划中）：面向岗位与流程编排专属智能体",
+    "统一治理：OA 单点登录、角色权限、全链路审计",
   ],
   idpLabel: "捷配 OA",
-  copyright: "捷配科技 © 2026 · 捷配 AI Studio MVP v0.1",
-  supportEmail: "it-support@jiepei.com",
+  trustLine: "会话加密传输，符合企业安全合规要求",
+  copyright: "捷配科技 © 2026 · 捷配 AI 工作台",
 };
 
 const FOLIA_BRAND: BrandConfig = {
   name: "FoliaAI",
-  headline: ["统一入口", "AI 知识底座"],
+  headline: ["一站式", "AI 知识与智能体平台"],
   description:
-    "知识库、技能与 Agent 的统一使用入口，可管控、可审计，保障数据安全合规。",
+    "私有知识可检索可问答，AI 能力可组合可编排——知识库、技能与定制 Agent 的统一入口。",
   points: [
-    "统一身份登录，无需注册",
-    "知识库统一管理，文档检索与智能问答",
-    "技能中心，可复用的 AI 能力编排",
-    "RBAC 角色权限，全链路登录审计",
+    "知识系统：文档统一管理、语义检索与智能问答",
+    "技能（Skill）：可复用的 AI 能力，自由组合调用",
+    "定制 Agent（规划中）：按需编排个人与团队专属智能体",
+    "安全可控：统一认证、角色权限、数据私有",
   ],
   idpLabel: "Logto",
-  copyright: "FoliaAI © 2026 · AI 知识与技能平台 MVP v0.1",
+  trustLine: "登录会话加密传输，保障账号与数据安全",
+  copyright: "FoliaAI © 2026",
   // GitHub 组织头像原图（256px），本地化存放避免外链
   logoUrl: "/brand/foliaai.png",
 };
