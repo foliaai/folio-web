@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import {
   fetchChatModels,
@@ -375,6 +376,12 @@ export default function SettingsPage() {
   ] as const;
 
   return (
+    <RequireAuth
+      featureLabel="设置"
+      title="登录后管理你的设置"
+      description="模型偏好、个人资料与数据管理均关联你的账号，登录后即可配置。"
+      nextPath="/settings"
+    >
     <div className="min-h-screen bg-gray-50/60 pb-16">
       {/* 隐藏的头像上传 input */}
       <input
@@ -974,6 +981,7 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
+    </RequireAuth>
   );
 }
 
