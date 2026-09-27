@@ -10,11 +10,11 @@ export interface FeatureConfig {
   icon: ComponentType<{ className?: string }>;
   /**
    * 始终锁定（敬请期待），与登录态无关。
-   * 登录前后都不可进入，点击只展示「敬请期待」提示。
+   * 登录前后都不可进入：未登录点击直跳登录页，登录后点击无动作（不弹窗）。
    */
   locked?: boolean;
   /**
-   * 需要登录才能访问。登录前点击会弹出登录 modal。
+   * 需要登录才能访问。登录前点击直跳登录页（带 next 回跳）。
    * locked 优先级高于 requiresAuth。
    */
   requiresAuth?: boolean;

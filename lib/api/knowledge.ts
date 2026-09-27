@@ -52,10 +52,6 @@ function buildHeaders(init?: RequestInit): HeadersInit {
   const defaultHeaders = getCommonHeaders();
   const nextHeaders: Record<string, string> = {};
 
-  if (defaultHeaders["X-User-Id"]) {
-    nextHeaders["X-User-Id"] = defaultHeaders["X-User-Id"];
-  }
-
   if (defaultHeaders.Authorization) {
     nextHeaders.Authorization = defaultHeaders.Authorization;
   }

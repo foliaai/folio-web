@@ -170,7 +170,6 @@ export async function uploadSkillCover(
   const url = skillApiUrl(`/skills/${encodeURIComponent(name)}/cover`);
   const headers = getCommonHeaders();
   const nextHeaders: Record<string, string> = {};
-  if (headers["X-User-Id"]) nextHeaders["X-User-Id"] = headers["X-User-Id"];
   if (headers.Authorization) nextHeaders.Authorization = headers.Authorization;
 
   const formData = new FormData();

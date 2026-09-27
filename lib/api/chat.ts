@@ -35,9 +35,6 @@ function buildHeaders(init?: RequestInit): HeadersInit {
   const next: Record<string, string> = {
     "Content-Type": defaultHeaders["Content-Type"],
   };
-  if (defaultHeaders["X-User-Id"]) {
-    next["X-User-Id"] = defaultHeaders["X-User-Id"];
-  }
   if (defaultHeaders.Authorization) {
     next.Authorization = defaultHeaders.Authorization;
   }

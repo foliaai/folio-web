@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generateInitialData } from "@/lib/identicon";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,12 @@ export function UserAvatar({
   const [imageError, setImageError] = useState(false);
   const targetUserId = userId || "default_user";
   const pixelSize = typeof size === "number" ? size : SIZE_MAP[size] || 32;
+
+  // 头像 URL 变化（上传新头像带新时间戳）时重置错误态：
+  // 否则一次瞬时加载失败会永久锁存，只能靠组件重挂载（刷新页面）恢复
+  useEffect(() => {
+    setImageError(false);
+  }, [avatarUrl]);
 
   // 计算 Initials 品牌渐变徽章数据
   const initialData = useMemo(() => {

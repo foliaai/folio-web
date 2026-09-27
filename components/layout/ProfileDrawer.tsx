@@ -13,8 +13,7 @@ interface ProfileDrawerProps {
 /**
  * 桌面端个人空间抽屉（md 及以上）。
  *
- * 移动端不再弹出抽屉：底栏「我的」是一个独立页面（/profile），
- * 所以这里整体 hidden md:flex，避免小屏上又滑出一层浮层。
+ * 移动端不弹抽屉：个人资料管理在设置页首个 tab（/settings）。
  */
 export const ProfileDrawer = ({ isOpen, onClose }: ProfileDrawerProps) => {
   const { isAuthenticated } = useAuth();
