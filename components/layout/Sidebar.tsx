@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Settings,
   HelpCircle,
+  Home,
   LogOut,
   Lock,
   Sparkles,
@@ -51,8 +52,9 @@ export const Sidebar = () => {
     }
   };
 
-  // 移动端底部栏展示的导航列表（个人资料并入设置页首个 tab，不再单独设「我的」）
+  // 移动端底部栏：首页（通用智能体平台）+ 知识库 + 技能 + 智能体 + 设置
   const mobileNavItems = [
+    { key: "home", label: "首页", href: "/", icon: FEATURES.find((f) => f.key === "home")?.icon || Home },
     { key: "knowledge", label: "知识库", href: "/knowledge", icon: FEATURES.find((f) => f.key === "knowledge")?.icon || Sparkles },
     { key: "skills", label: "技能", href: "/skills", icon: FEATURES.find((f) => f.key === "skills")?.icon || Sparkles },
     { key: "agents", label: "智能体", href: "/agents", icon: FEATURES.find((f) => f.key === "agents")?.icon || Sparkles },
