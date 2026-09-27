@@ -14,7 +14,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "FoliaAI",
-  description: "为创新赋能，与智慧同行",
+  description: "以知识为源，让效率生长",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

@@ -180,7 +180,7 @@ export default function HelpPage() {
             <h3 className="text-sm font-bold text-foreground">相关开源项目</h3>
           </div>
           <p className="mb-4 text-sm leading-relaxed text-muted">
-            FoliaAI 是个人维护的 Agentic 知识工作台：左侧管理资料，中间预览文档，右侧对话并按原文坐标溯源。
+            FoliaAI 是围绕知识构建的 AI 品牌：把沉淀的资料变成可检索、可对话、可行动的智能，帮助每个人更高效地思考与创造——以知识为源，让效率生长。
           </p>
           <ul className="space-y-2">
             {PROJECTS.map((project) => (
