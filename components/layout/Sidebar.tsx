@@ -157,10 +157,26 @@ export const Sidebar = () => {
           })}
         </nav>
 
-        {/* Bottom Items */}
+        {/* Bottom Items（设置需登录：未登录上锁直跳登录页；关于公开） */}
         <div className="flex flex-col gap-4">
           {bottomItems.map((item) => {
             const Icon = item.icon;
+            if (item.href === "/settings" && !isAuthenticated) {
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => goToLogin(item.href)}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-pointer hover:bg-primary/10"
+                  aria-label={item.label}
+                >
+                  <Icon className="h-5 w-5 text-foreground" />
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 text-primary-deep shadow-xs">
+                    <Lock className="h-2.5 w-2.5 text-primary-deep" />
+                  </span>
+                </button>
+              );
+            }
             return (
               <Link
                 key={item.href}
@@ -193,11 +209,14 @@ export const Sidebar = () => {
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
           const featConfig = FEATURES.find((f) => f.href === item.href);
+          const settingsLocked = !isAuthenticated && item.href === "/settings";
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));
           const showLockBadge =
-            featConfig?.locked || (!isAuthenticated && featConfig?.requiresAuth);
+            featConfig?.locked ||
+            (!isAuthenticated && featConfig?.requiresAuth) ||
+            settingsLocked;
 
           const innerContent = (
             <div className="flex flex-col items-center gap-0.5 py-1">
@@ -225,15 +244,24 @@ export const Sidebar = () => {
             </div>
           );
 
-          if (featConfig && (featConfig.locked || (!isAuthenticated && featConfig.requiresAuth))) {
+          if (
+            settingsLocked ||
+            (featConfig &&
+              (featConfig.locked ||
+                (!isAuthenticated && featConfig.requiresAuth)))
+          ) {
             return (
               <button
                 key={item.href}
                 type="button"
-                onClick={() => handleLockedClick(featConfig)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    goToLogin(item.href);
+                  }
+                }}
                 className={cn(
                   "flex flex-1 items-center justify-center px-1",
-                  featConfig.locked && isAuthenticated
+                  featConfig?.locked && isAuthenticated
                     ? "cursor-not-allowed"
                     : "cursor-pointer"
                 )}

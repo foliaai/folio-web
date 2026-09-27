@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   User,
   Sparkles,
@@ -30,7 +31,6 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { RequireAuth } from "@/components/auth/RequireAuth";
 import {
   fetchChatModels,
   groupChatModelsByProvider,
@@ -56,7 +56,15 @@ type TabType = "profile" | "ai" | "data" | "system";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, isReady, user, logout } = useAuth();
+  const router = useRouter();
+
+  // 未登录直达登录页（正常入口由侧边栏锁拦截，此处兜底直链访问）
+  useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace("/login?next=%2Fsettings");
+    }
+  }, [isReady, isAuthenticated, router]);
   const {
     userId,
     profile,
@@ -372,13 +380,12 @@ export default function SettingsPage() {
     { id: "system", label: "系统与连通性", icon: Cpu, desc: "后端状态与运行环境" },
   ] as const;
 
+  // 会话未就绪或未登录时不渲染（重定向登录页）
+  if (!isReady || !isAuthenticated) {
+    return <div className="min-h-screen bg-gray-50/60" />;
+  }
+
   return (
-    <RequireAuth
-      featureLabel="设置"
-      title="登录后管理你的设置"
-      description="模型偏好、个人资料与数据管理均关联你的账号，登录后即可配置。"
-      nextPath="/settings"
-    >
     <div className="min-h-screen bg-gray-50/60 pb-16">
       {/* 隐藏的头像上传 input */}
       <input
@@ -607,16 +614,10 @@ export default function SettingsPage() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                     <div className="flex items-center gap-2">
-                      {isAuthenticated ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary-deep ring-1 ring-primary/20">
-                          <ShieldCheck className="h-3 w-3" />
-                          Logto 账号已登录
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-muted ring-1 ring-gray-200">
-                          访客模式 (基于客户端身份)
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary-deep ring-1 ring-primary/20">
+                        <ShieldCheck className="h-3 w-3" />
+                        账号已登录
+                      </span>
                     </div>
                     {isEditingProfile ? (
                       <div className="flex items-center gap-2">
@@ -646,19 +647,17 @@ export default function SettingsPage() {
                   <div>
                     <h3 className="text-xs font-bold text-foreground">会话与认证管理</h3>
                     <p className="mt-0.5 text-xs text-muted">
-                      "当前已登录，退出后将清除本地会话缓存并重定向至登录页。"
+                      当前已登录，退出后将清除本地会话缓存并重定向至登录页。
                     </p>
                   </div>
-                  {isAuthenticated ? (
-                    <button
-                      type="button"
-                      onClick={logout}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
-                    >
-                      <LogOut className="h-3.5 w-3.5" />
-                      <span>退出登录</span>
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>退出登录</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -969,7 +968,6 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
-    </RequireAuth>
   );
 }
 
