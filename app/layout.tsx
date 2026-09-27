@@ -3,6 +3,13 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthModalProvider } from "@/components/auth/AuthModalProvider";
 import { AppShell } from "@/components/layout/AppShell";
+import { getAuthProviderName } from "@/lib/auth-providers";
+
+// 标签页小图标随部署品牌切换：捷配内网用无极方标，公网用 FoliaAI 头像
+const faviconUrl =
+  getAuthProviderName() === "oa"
+    ? "/brand/jiepei-favicon.png"
+    : "/brand/foliaai.png";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -13,14 +20,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "JarsonCai's Assistant",
-  description: "为创新赋能，与智慧同行",
+  title: "FoliaAI",
+  description: "以知识为源，让效率生长",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: faviconUrl, type: "image/png" },
     ],
     apple: [
-      { url: "/apple-icon.svg", type: "image/svg+xml" },
+      { url: faviconUrl, type: "image/png" },
     ],
   },
 };

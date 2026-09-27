@@ -38,14 +38,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  LockKeyhole,
-  LogIn,
   PanelLeftOpen,
   X,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import { RequireAuth } from "@/components/auth/RequireAuth";
 
 /** 问答作用域：锁定到某个知识库，或该知识库下的某个文件夹 */
 interface ChatScope {
@@ -239,63 +237,15 @@ function InputModal({
 }
 
 function KnowledgeGuestView() {
-  const { openAuthModal } = useAuthModal();
-
   return (
-    <div className="min-h-screen p-8 md:p-12">
-      <div className="mx-auto max-w-6xl">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-          <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-muted">
-            <LockKeyhole className="h-3.5 w-3.5 text-primary-light" />
-            登录后可创建私有知识库
-          </div>
-
-          <div className="mt-6 max-w-3xl">
-            <h1 className="text-4xl font-light text-foreground md:text-5xl">
-              把你的文档、制度与项目资料，整理成可持续追问的知识空间
-            </h1>
-            <p className="mt-4 text-base leading-7 text-muted">
-              这里不是冷冰冰的文件仓库，而是你和资料之间的长期工作界面。上传后自动处理、按文件夹管理、围绕单篇文档继续追问，适合合同、会议纪要、方案库和 SOP 等高频知识场景。
-            </p>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                openAuthModal({
-                  title: "登录以创建你的专属知识库",
-                  description:
-                    "登录后你可以上传文档、保存文件夹结构，并把这些私有内容长期沉淀到你的个人工作区。",
-                  nextPath: "/knowledge",
-                  featureLabel: "创建我的知识库",
-                })
-              }
-              className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5"
-            >
-              <LogIn className="h-4 w-4" />
-              创建我的知识库
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                openAuthModal({
-                  title: "登录以上传文档并开始使用",
-                  description:
-                    "上传、文档处理和文档级问答都会消耗私有资源。登录后系统才能为你安全保存文件与后续问答记录。",
-                  nextPath: "/knowledge",
-                  featureLabel: "上传文档",
-                })
-              }
-              className="rounded-2xl border border-gray-200 px-5 py-3 text-sm text-foreground transition hover:bg-gray-50"
-            >
-              上传文档并开始问答
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <RequireAuth
+      featureLabel="知识库"
+      title="登录后构建你的专属知识库"
+      description="上传文档、保存文件夹结构，并围绕私有内容持续问答——这些内容将长期沉淀到你的个人工作区。"
+      nextPath="/knowledge"
+    >
+      <KnowledgeWorkspace />
+    </RequireAuth>
   );
 }
 
