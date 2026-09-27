@@ -6,7 +6,31 @@ import Link from "next/link";
 import { LayoutGrid, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getAuthProviderName } from "@/lib/auth-providers";
-import { getBrandConfig } from "@/lib/brand";
+import { getBrandConfig, type BrandConfig } from "@/lib/brand";
+
+/**
+ * 品牌标：有 logoUrl 用品牌图（白底芯片，适配深绿底上的白底 PNG），
+ * 没有则回退通用图形图标。
+ */
+function BrandMark({ brand, boxClass }: { brand: BrandConfig; boxClass: string }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center overflow-hidden ${
+        brand.logoUrl ? "bg-white" : "bg-white/15"
+      } ${boxClass}`}
+    >
+      {brand.logoUrl ? (
+        <img
+          src={brand.logoUrl}
+          alt=""
+          className="h-full w-full object-contain p-[12%]"
+        />
+      ) : (
+        <LayoutGrid className="h-1/2 w-1/2 text-white" />
+      )}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -56,9 +80,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-primary/50 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
-            <LayoutGrid className="h-6 w-6 text-white" />
-          </div>
+          <BrandMark brand={brand} boxClass="h-11 w-11 rounded-xl" />
           <span className="text-xl font-semibold tracking-wide text-white">
             {brand.name}
           </span>
@@ -100,9 +122,7 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md">
           {/* 小屏品牌行：左侧品牌区隐藏时保持品牌存在 */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-deep">
-              <LayoutGrid className="h-5 w-5 text-white" />
-            </div>
+            <BrandMark brand={brand} boxClass="h-10 w-10 rounded-xl" />
             <span className="text-lg font-semibold tracking-wide text-foreground">
               {brand.name}
             </span>
@@ -147,7 +167,7 @@ export default function LoginPage() {
               {isSubmitting ? (
                 <LoaderCircle className="h-5 w-5 animate-spin" />
               ) : (
-                <LayoutGrid className="h-5 w-5" />
+                <BrandMark brand={brand} boxClass="h-6 w-6 rounded-md" />
               )}
               {isSubmitting ? "正在跳转..." : `使用 ${brand.idpLabel} 账号登录`}
             </button>

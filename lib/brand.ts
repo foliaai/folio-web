@@ -24,6 +24,8 @@ export interface BrandConfig {
   copyright: string;
   /** IT 支持邮箱（企业内网部署配置）；公网部署留空，落版改用帮助中心链接 */
   supportEmail?: string;
+  /** 品牌 Logo 图片（public/ 下路径）；留空回退为通用图形图标 */
+  logoUrl?: string;
 }
 
 const JIEPEI_BRAND: BrandConfig = {
@@ -54,6 +56,8 @@ const FOLIA_BRAND: BrandConfig = {
   ],
   idpLabel: "Logto",
   copyright: "FoliaAI © 2026 · AI 知识与技能平台 MVP v0.1",
+  // GitHub 组织头像原图（256px），本地化存放避免外链
+  logoUrl: "/brand/foliaai.png",
 };
 
 export function getBrandConfig(): BrandConfig {
