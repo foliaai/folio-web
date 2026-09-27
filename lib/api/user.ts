@@ -5,7 +5,7 @@
  * 头像上传/删除暂仍走 AKS（依赖 MinIO 存储服务，待其迁入 auth-server 后切换）。
  */
 
-import { API_CONFIG, authApiUrl, getCommonHeaders } from "@/lib/config";
+import { authApiUrl, getCommonHeaders } from "@/lib/config";
 
 export interface UserProfileData {
   user_id: string;
