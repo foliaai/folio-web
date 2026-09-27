@@ -5,20 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LayoutGrid, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getAuthProviderLabel, getAuthProviderName } from "@/lib/auth-providers";
-
-// 左侧品牌区卖点（与平台规划一致：统一入口 / 知识库 / 技能 / 治理）
-const BRAND_POINTS = [
-  "企业身份统一登录，无需注册",
-  "知识库统一管理，文档检索与智能问答",
-  "技能中心，可复用的 AI 能力编排",
-  "RBAC 角色权限，全链路登录审计",
-];
+import { getAuthProviderName } from "@/lib/auth-providers";
+import { getBrandConfig } from "@/lib/brand";
 
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isReady, login } = useAuth();
-  const providerLabel = getAuthProviderLabel();
+  const brand = getBrandConfig();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nextPath, setNextPath] = useState("/");
@@ -67,24 +60,25 @@ export default function LoginPage() {
             <LayoutGrid className="h-6 w-6 text-white" />
           </div>
           <span className="text-xl font-semibold tracking-wide text-white">
-            Folio
+            {brand.name}
           </span>
         </div>
 
         <div className="relative max-w-xl">
-          <h1 className="text-5xl font-light leading-tight text-white xl:text-6xl">
-            统一入口
+          <h1
+            className="text-5xl font-light leading-tight text-white xl:text-6xl"
+          >
+            {brand.headline[0]}
           </h1>
           <h1 className="mt-1 text-5xl font-bold leading-tight text-white xl:text-6xl">
-            AI 知识底座
+            {brand.headline[1]}
           </h1>
           <p className="mt-8 text-[15px] leading-7 text-white/90">
-            知识库、技能与 Agent
-            的统一使用入口，可管控、可审计，保障数据安全合规。
+            {brand.description}
           </p>
 
           <ul className="mt-10 space-y-5">
-            {BRAND_POINTS.map((point) => (
+            {brand.points.map((point) => (
               <li key={point} className="flex items-center gap-3">
                 <span
                   className="h-2 w-2 shrink-0 bg-white/70"
@@ -98,9 +92,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-sm text-white/75">
-          FolioAI © 2026 · Folio 平台 MVP v0.1
-        </p>
+        <p className="relative text-sm text-white/75">{brand.copyright}</p>
       </aside>
 
       {/* ==================== 右侧登录区 ==================== */}
@@ -112,13 +104,13 @@ export default function LoginPage() {
               <LayoutGrid className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-semibold tracking-wide text-foreground">
-              Folio
+              {brand.name}
             </span>
           </div>
 
           <h2 className="text-4xl font-bold text-foreground">欢迎登录</h2>
           <p className="mt-3 text-base text-muted">
-            使用 {providerLabel} 账号访问 Folio
+            使用 {brand.idpLabel} 账号访问 {brand.name}
           </p>
 
           <div className="mt-10 border-t border-hairline" />
@@ -157,9 +149,7 @@ export default function LoginPage() {
               ) : (
                 <LayoutGrid className="h-5 w-5" />
               )}
-              {isSubmitting
-                ? "正在跳转..."
-                : `使用 ${providerLabel} 账号登录`}
+              {isSubmitting ? "正在跳转..." : `使用 ${brand.idpLabel} 账号登录`}
             </button>
 
             <p className="text-center text-xs text-muted-subtle">
@@ -173,13 +163,28 @@ export default function LoginPage() {
             登录即表示同意
             <span className="font-medium text-foreground">使用规范</span> 与
             <span className="font-medium text-foreground">隐私政策</span>
-            。如需帮助请查看
-            <Link
-              href="/help"
-              className="font-medium text-primary-deep underline-offset-2 hover:underline"
-            >
-              帮助中心
-            </Link>
+            。如需帮助
+            {brand.supportEmail ? (
+              <>
+                请联系 IT 支持：
+                <a
+                  href={`mailto:${brand.supportEmail}`}
+                  className="font-medium text-primary-deep underline-offset-2 hover:underline"
+                >
+                  {brand.supportEmail}
+                </a>
+              </>
+            ) : (
+              <>
+                请查看
+                <Link
+                  href="/help"
+                  className="font-medium text-primary-deep underline-offset-2 hover:underline"
+                >
+                  帮助中心
+                </Link>
+              </>
+            )}
             。
           </p>
         </div>
