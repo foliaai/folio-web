@@ -54,9 +54,14 @@ const PROJECTS = [
     href: "https://github.com/foliaai/folio-aks-server",
   },
   {
-    name: "folio-agent-server",
-    desc: "智能体应用平台：会议纪要合规检查等 Agent 应用，与文档解析、文件存储公共服务。",
-    href: "https://github.com/foliaai/folio-agent-server",
+    name: "folio-auth-server",
+    desc: "统一认证与系统设置服务：企业 OA / Logto 双上游登录，全系统唯一的本域 JWT 签发方。",
+    href: "https://github.com/foliaai/folio-auth-server",
+  },
+  {
+    name: "folio-auth-core",
+    desc: "认证验签核心包（verify-only）：各后端经 JWKS 公钥本地验签，消费 folio-auth-server 签发的凭证。",
+    href: "https://github.com/foliaai/folio-auth-core",
   },
   {
     name: "folio-skill-server",
@@ -67,6 +72,21 @@ const PROJECTS = [
     name: "folio-skill-core",
     desc: "技能系统核心包：解析、注册表、安全扫描与 MySQL 仓储，供 folio-skill-server 与各后端复用。",
     href: "https://github.com/foliaai/folio-skill-core",
+  },
+  {
+    name: "folio-agent-server",
+    desc: "智能体应用平台：会议纪要合规检查等 Agent 应用，与文档解析、文件存储公共服务。",
+    href: "https://github.com/foliaai/folio-agent-server",
+  },
+  {
+    name: "folio-infra",
+    desc: "Docker 化的支撑基础设施：一键拉起系统依赖的中间件与基础服务。",
+    href: "https://github.com/foliaai/folio-infra",
+  },
+  {
+    name: "folio-server",
+    desc: "预留的统一服务仓库（暂未启用）。",
+    href: "https://github.com/foliaai/folio-server",
   },
 ];
 
