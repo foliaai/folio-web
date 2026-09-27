@@ -37,7 +37,7 @@ export interface BrandConfig {
 }
 
 const JIEPEI_BRAND: BrandConfig = {
-  name: "捷配 AI 工作台",
+  name: "捷配·AI 工作台",
   headline: ["面向捷配全员的", "AI 能力工作台"],
   description:
     "知识、技能与 Agent 汇于一个入口：企业知识可沉淀，AI 能力可复用，专属 Agent 可定制。",
@@ -49,7 +49,7 @@ const JIEPEI_BRAND: BrandConfig = {
   ],
   idpLabel: "捷配 OA",
   trustLine: "会话加密传输，符合企业安全合规要求",
-  copyright: "捷配科技 © 2026 · 捷配 AI 工作台",
+  copyright: "捷配科技 © 2026 · 捷配·AI 工作台",
   // 无极系统同款方标（青绿 #00989D 自带圆角方块），裸放于深绿面板
   logoUrl: "/brand/jiepei.png",
   logoStyle: "raw",

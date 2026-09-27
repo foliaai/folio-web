@@ -37,6 +37,50 @@ function BrandMark({ brand, boxClass }: { brand: BrandConfig; boxClass: string }
   );
 }
 
+/**
+ * 品牌 Lockup：标志 +（名称 + 可选标语）两排文字，标志与文字块整体对齐。
+ * size=lg 用于左侧品牌区，size=sm 用于小屏品牌行。
+ */
+function BrandLockup({ brand, size }: { brand: BrandConfig; size: "lg" | "sm" }) {
+  const hasSlogan = Boolean(brand.slogan);
+  const markClass =
+    size === "lg"
+      ? hasSlogan
+        ? "h-14 w-14 rounded-xl"
+        : "h-11 w-11 rounded-xl"
+      : hasSlogan
+        ? "h-12 w-12 rounded-lg"
+        : "h-10 w-10 rounded-lg";
+
+  return (
+    <div className="flex items-center gap-3">
+      <BrandMark brand={brand} boxClass={markClass} />
+      <div className="flex min-w-0 flex-col">
+        <span
+          className={
+            size === "lg"
+              ? "text-xl font-semibold leading-7 tracking-wide text-white"
+              : "text-base font-semibold leading-6 tracking-wide text-foreground"
+          }
+        >
+          {brand.name}
+        </span>
+        {brand.slogan && (
+          <p
+            className={
+              size === "lg"
+                ? "mt-1.5 text-xs leading-4 tracking-wider text-white/80"
+                : "mt-1 text-[11px] leading-4 tracking-wider text-muted"
+            }
+          >
+            {brand.slogan}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isReady, login } = useAuth();
@@ -85,17 +129,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-primary/50 blur-3xl" />
 
         <div className="relative">
-          <div className="flex items-center gap-3">
-            <BrandMark brand={brand} boxClass="h-11 w-11 rounded-xl" />
-            <span className="text-xl font-semibold tracking-wide text-white">
-              {brand.name}
-            </span>
-          </div>
-          {brand.slogan && (
-            <p className="mt-2 pl-[3.25rem] text-xs tracking-wider text-white/80">
-              {brand.slogan}
-            </p>
-          )}
+          <BrandLockup brand={brand} size="lg" />
         </div>
 
         <div className="relative max-w-xl">
@@ -133,11 +167,8 @@ export default function LoginPage() {
       <main className="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2">
         <div className="mx-auto w-full max-w-md">
           {/* 小屏品牌行：左侧品牌区隐藏时保持品牌存在 */}
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <BrandMark brand={brand} boxClass="h-10 w-10 rounded-xl" />
-            <span className="text-lg font-semibold tracking-wide text-foreground">
-              {brand.name}
-            </span>
+          <div className="mb-10 lg:hidden">
+            <BrandLockup brand={brand} size="sm" />
           </div>
 
           <h2 className="text-4xl font-bold text-foreground">欢迎登录</h2>
