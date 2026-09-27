@@ -10,6 +10,8 @@ interface LockedFeatureScreenProps {
   featureLabel: string;
   /** 一句话副标题，默认「敬请期待」 */
   subtitle?: string;
+  /** 首段说明文案，默认「该模块正在打磨中，暂未开放使用。」 */
+  description?: string;
 }
 
 /**
@@ -22,6 +24,7 @@ interface LockedFeatureScreenProps {
 export function LockedFeatureScreen({
   featureLabel,
   subtitle = "敬请期待",
+  description,
 }: LockedFeatureScreenProps) {
   const { isAuthenticated } = useAuth();
   const { openAuthModal } = useAuthModal();
@@ -38,7 +41,7 @@ export function LockedFeatureScreen({
         </h1>
         <p className="mt-2 text-sm text-primary-light/90">{subtitle}</p>
         <p className="mt-4 max-w-md text-sm leading-7 text-muted">
-          该模块正在打磨中，暂未开放使用。
+          {description ?? "该模块正在打磨中，暂未开放使用。"}
           {isAuthenticated
             ? "你可以先使用左侧的「知识库」与「技能」继续你的工作。"
             : "登录后可先使用「知识库」与「技能」模块。"}

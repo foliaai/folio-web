@@ -26,5 +26,11 @@ export default function HomePage() {
     return <div className="min-h-screen bg-gray-50" />;
   }
 
-  return <LockedFeatureScreen featureLabel="首页" />;
+  return (
+    <LockedFeatureScreen
+      featureLabel="知行智能体平台"
+      subtitle="个人知识库 × 通用智能体"
+      description="以你的知识库为记忆底座，通用 Agent 在此检索、推理与执行；技能可复用、智能体可定制，知识与行动合一。"
+    />
+  );
 }
