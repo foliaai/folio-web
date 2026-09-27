@@ -13,7 +13,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "JarsonCai's Assistant",
+  title: "FoliaAI",
   description: "为创新赋能，与智慧同行",
   icons: {
     icon: [
