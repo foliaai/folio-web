@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { LayoutGrid, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { AUTO_LOGIN_ATTEMPT_KEY } from "@/lib/auth";
 import { getAuthProviderLabel, getAuthProviderName } from "@/lib/auth-providers";
+
+// 左侧品牌区卖点（与平台规划一致：统一入口 / 知识库 / 技能 / 治理）
+const BRAND_POINTS = [
+  "企业身份统一登录，无需注册",
+  "知识库统一管理，文档检索与智能问答",
+  "技能中心，可复用的 AI 能力编排",
+  "RBAC 角色权限，全链路登录审计",
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,27 +37,6 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, isReady, nextPath, router]);
 
-  // 自动登录：到达本页即直接跳转登录窗口（每浏览器会话至多一次）。
-  // 标记防循环：失败返回或主动登出后回到本页时，保留手动按钮不再自动弹。
-  useEffect(() => {
-    if (!isReady || isAuthenticated) return;
-    if (sessionStorage.getItem(AUTO_LOGIN_ATTEMPT_KEY)) return;
-
-    sessionStorage.setItem(AUTO_LOGIN_ATTEMPT_KEY, "1");
-    setIsSubmitting(true);
-
-    // next 从 URL 同步读取，避免与 nextPath 状态的赋值时序竞态
-    const next = new URLSearchParams(window.location.search).get("next") || "/";
-    login(next).catch((autoError) => {
-      setIsSubmitting(false);
-      setError(
-        autoError instanceof Error ? autoError.message : "跳转登录失败，请重试"
-      );
-    });
-    // login 为跳转副作用；标记先行保证只执行一次（StrictMode 双跑同样安全）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, isAuthenticated]);
-
   const handleLogin = async () => {
     setError(null);
     setIsSubmitting(true);
@@ -57,72 +44,146 @@ export default function LoginPage() {
     try {
       await login(nextPath);
     } catch (loginError) {
-setError(
-          loginError instanceof Error
-            ? loginError.message
-            : "跳转登录失败，请重试"
-        );
+      setError(
+        loginError instanceof Error
+          ? loginError.message
+          : "跳转登录失败，请重试"
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-50 px-6 py-12">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,179,107,0.12),transparent_40%)]" />
-      <div className="relative w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-2xl">
-        <div className="mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary-deep">
-            <ShieldCheck className="h-6 w-6" />
+    <div className="flex min-h-screen bg-white">
+      {/* ==================== 左侧品牌区（大屏显示） ==================== */}
+      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-primary-deep p-12 xl:p-16 lg:flex">
+        {/* 装饰光斑：primary-light 在深绿底上做出渐变层次 */}
+        <div className="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-primary-light/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-primary/50 blur-3xl" />
+
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+            <LayoutGrid className="h-6 w-6 text-white" />
           </div>
-          <h1 className="mt-5 text-2xl font-bold text-foreground">统一登录</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            使用 {providerLabel} 完成身份认证，登录后即可访问知识库、Agent 和文件操作能力。
-          </p>
+          <span className="text-xl font-semibold tracking-wide text-white">
+            Folio
+          </span>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-6 text-muted">
-            当前页面不会直接采集用户名和密码，点击下方按钮后会跳转到 {providerLabel} 完成登录。
-          </div>
-          {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
+        <div className="relative max-w-xl">
+          <h1 className="text-5xl font-light leading-tight text-white xl:text-6xl">
+            统一入口
+          </h1>
+          <h1 className="mt-1 text-5xl font-bold leading-tight text-white xl:text-6xl">
+            AI 知识底座
+          </h1>
+          <p className="mt-8 text-[15px] leading-7 text-white/90">
+            知识库、技能与 Agent
+            的统一使用入口，可管控、可审计，保障数据安全合规。
+          </p>
 
-          {getAuthProviderName() === "oa" &&
-            !process.env.NEXT_PUBLIC_OA_SSO_LOGOUT_URL && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-700">
-                <p className="font-medium">更换账号登录？</p>
-                <p className="mt-1">
-                  OA 授权状态由浏览器保留，直接点击登录会免扫码恢复为原账号。换人请任选其一：
-                </p>
-                <p className="mt-1">
-                  ① 用无痕窗口打开本系统，扫码即新账号；
-                  ② 按 F12 → 应用 → Cookie，删除 jiepei.com 下的
-                  <span className="mono"> WuJiAppAuthbtns </span>
-                  后再点登录；
-                  ③ 先在无极 OA 中退出登录。
-                </p>
+          <ul className="mt-10 space-y-5">
+            {BRAND_POINTS.map((point) => (
+              <li key={point} className="flex items-center gap-3">
+                <span
+                  className="h-2 w-2 shrink-0 bg-white/70"
+                  aria-hidden="true"
+                />
+                <span className="text-[15px] leading-6 text-white/90">
+                  {point}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="relative text-sm text-white/75">
+          FolioAI © 2026 · Folio 平台 MVP v0.1
+        </p>
+      </aside>
+
+      {/* ==================== 右侧登录区 ==================== */}
+      <main className="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2">
+        <div className="mx-auto w-full max-w-md">
+          {/* 小屏品牌行：左侧品牌区隐藏时保持品牌存在 */}
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-deep">
+              <LayoutGrid className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-lg font-semibold tracking-wide text-foreground">
+              Folio
+            </span>
+          </div>
+
+          <h2 className="text-4xl font-bold text-foreground">欢迎登录</h2>
+          <p className="mt-3 text-base text-muted">
+            使用 {providerLabel} 账号访问 Folio
+          </p>
+
+          <div className="mt-10 border-t border-hairline" />
+
+          <div className="mt-10 space-y-4">
+            {error && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
               </div>
             )}
 
-          <button
-            type="button"
-            onClick={handleLogin}
-            disabled={isSubmitting || !isReady}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5 hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60 shadow-md shadow-primary/20"
-          >
-            {isSubmitting ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-            ) : (
-              <LogIn className="h-4 w-4" />
-            )}
-            {isSubmitting ? "正在跳转..." : `前往 ${providerLabel} 登录`}
-          </button>
+            {getAuthProviderName() === "oa" &&
+              !process.env.NEXT_PUBLIC_OA_SSO_LOGOUT_URL && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-700">
+                  <p className="font-medium">更换账号登录？</p>
+                  <p className="mt-1">
+                    OA
+                    授权状态由浏览器保留，直接点击登录会免扫码恢复为原账号。换人请任选其一：
+                  </p>
+                  <p className="mt-1">
+                    ① 用无痕窗口打开本系统，扫码即新账号； ② 按 F12 → 应用 →
+                    Cookie，删除 jiepei.com 下的 WuJiAppAuthbtns
+                    后再点登录； ③ 先在无极 OA 中退出登录。
+                  </p>
+                </div>
+              )}
+
+            <button
+              type="button"
+              onClick={handleLogin}
+              disabled={isSubmitting || !isReady}
+              className="flex h-14 w-full items-center justify-center gap-3 rounded-lg bg-primary px-4 text-base font-medium text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? (
+                <LoaderCircle className="h-5 w-5 animate-spin" />
+              ) : (
+                <LayoutGrid className="h-5 w-5" />
+              )}
+              {isSubmitting
+                ? "正在跳转..."
+                : `使用 ${providerLabel} 账号登录`}
+            </button>
+
+            <p className="text-center text-xs text-muted-subtle">
+              会话加密传输，符合企业安全合规要求
+            </p>
+          </div>
+
+          <div className="mt-10 border-t border-hairline" />
+
+          <p className="mt-8 text-sm leading-6 text-muted-subtle">
+            登录即表示同意
+            <span className="font-medium text-foreground">使用规范</span> 与
+            <span className="font-medium text-foreground">隐私政策</span>
+            。如需帮助请查看
+            <Link
+              href="/help"
+              className="font-medium text-primary-deep underline-offset-2 hover:underline"
+            >
+              帮助中心
+            </Link>
+            。
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
