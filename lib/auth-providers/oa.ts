@@ -20,6 +20,8 @@ interface OALoginUserData {
   name?: string | null;
   alias_name?: string | null;
   role?: string | null;
+  /** 自定义头像 URL（MinIO + avatar_url，无则为空） */
+  avatar?: string | null;
 }
 
 interface OALoginResponseData {
@@ -117,7 +119,8 @@ function clearPendingState(): void {
 }
 
 function toAuthUser(data: OALoginUserData): AuthUser {
-  const displayName = data.name || data.alias_name || data.employee_no || data.user_id;
+  // 服务端已完成 Name(AlisName) 组合并优先库内自定义昵称；此处仅做工号兜底
+  const displayName = data.name || data.employee_no || data.user_id;
 
   return {
     id: data.user_id,
@@ -125,7 +128,9 @@ function toAuthUser(data: OALoginUserData): AuthUser {
     sub: data.user_id,
     name: displayName,
     username: data.employee_no || data.user_id,
-    preferred_username: data.employee_no || undefined,
+    preferred_username: displayName,
+    avatar: data.avatar || undefined,
+    picture: data.avatar || undefined,
     role: data.role || "user",
   };
 }
