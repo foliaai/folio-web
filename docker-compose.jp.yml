@@ -9,5 +9,8 @@ services:
     restart: unless-stopped
     ports:
       - "4001:3000"
+    # Next 服务端 rewrite(/auth-api) 转发 auth-server 用 host.docker.internal:8003
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env.jp
