@@ -30,12 +30,12 @@ export const ProfileDrawer = ({ isOpen, onClose }: ProfileDrawerProps) => {
       />
 
       {/* 抽屉容器：完全遵循网站纯白/极简质感设计规范。
-          z 必须低于侧边栏（z-1000）：收起时 left-[60px] - 自身宽度只把抽屉推到
-          x=0..60，那 60px 正好由侧边栏盖住；一旦抬到侧边栏之上，收起态就会在
+          z 必须低于侧边栏（z-1000）：收起时 left-[84px] - 自身宽度只把抽屉推到
+          x=0..84，那 84px 正好由侧边栏盖住；一旦抬到侧边栏之上，收起态就会在
           左栏上漏出一条白边和关闭按钮。 */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-[999] hidden h-full w-full max-w-[380px] flex-col bg-white text-foreground shadow-2xl transition-transform duration-300 ease-out md:left-[60px] md:flex md:border-r md:border-gray-200",
+          "fixed left-0 top-0 z-[999] hidden h-full w-full max-w-[380px] flex-col bg-white text-foreground shadow-2xl transition-transform duration-300 ease-out md:left-[84px] md:flex md:border-r md:border-gray-200",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         aria-hidden={!isOpen}
