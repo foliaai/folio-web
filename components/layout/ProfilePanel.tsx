@@ -177,7 +177,7 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               <h2 className="truncate text-base font-bold text-foreground">
                 {displayName}
               </h2>
-              <GenderBadge gender={gender} size={20} />
+              <GenderBadge gender={gender} />
               {!isEditing && (
                 <button
                   onClick={handleStartEdit}

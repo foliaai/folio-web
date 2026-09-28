@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 interface GenderBadgeProps {
   /** 性别：1=男，2=女；其他值（0/未提供）不渲染 */
   gender?: number | null;
-  /** 图标尺寸（px），默认 20 */
+  /** 图标尺寸（px），默认 15 */
   size?: number;
   className?: string;
 }
@@ -14,7 +14,7 @@ interface GenderBadgeProps {
  * lucide-react 0.468 尚无 Mars/Venus 图标，这里内联同风格 SVG
  * （等宽描边 + 圆头笔触），蓝=男、粉=女；hover 提示为文字。
  */
-export function GenderBadge({ gender, size = 20, className }: GenderBadgeProps) {
+export function GenderBadge({ gender, size = 15, className }: GenderBadgeProps) {
   if (gender !== 1 && gender !== 2) return null;
   const isMale = gender === 1;
 

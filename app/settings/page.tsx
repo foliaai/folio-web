@@ -478,7 +478,7 @@ export default function SettingsPage() {
                             className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-sm text-foreground transition-colors placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
                             placeholder="设置您的称呼"
                           />
-                          <GenderBadge gender={gender} size={20} />
+                          <GenderBadge gender={gender} />
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                               user?.username ||
                               (userId ? `用户 ${userId.slice(0, 8)}` : "未命名用户")}
                           </h3>
-                          <GenderBadge gender={gender} size={20} />
+                          <GenderBadge gender={gender} />
                           <button
                             type="button"
                             onClick={handleStartEditProfile}
