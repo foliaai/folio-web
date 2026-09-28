@@ -4,8 +4,11 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthModalProvider } from "@/components/auth/AuthModalProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { getAuthProviderName } from "@/lib/auth-providers";
+import { getBrandConfig } from "@/lib/brand";
 
-// 标签页小图标随部署品牌切换：捷配内网用无极方标，公网用 FoliaAI 头像
+// 标签页小图标与站点标题均随部署品牌切换（构建期随 NEXT_PUBLIC_AUTH_PROVIDER 二选一）：
+// 捷配内网用无极方标 + 捷配·AI 工作台，公网用 FoliaAI 头像 + FoliaAI
+const brand = getBrandConfig();
 const faviconUrl =
   getAuthProviderName() === "oa"
     ? "/brand/jiepei-favicon.png"
@@ -20,8 +23,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "FoliaAI",
-  description: "以知识为源，让效率生长",
+  title: brand.name,
+  description: brand.slogan,
   icons: {
     icon: [
       { url: faviconUrl, type: "image/png" },

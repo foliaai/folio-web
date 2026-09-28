@@ -14,9 +14,11 @@ import {
   LogOut,
   Sparkles,
   Loader2,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { GenderBadge } from "@/components/ui/GenderBadge";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -41,6 +43,8 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
     avatarUrl,
     nickname,
     bio,
+    gender,
+    departments,
     isLoading,
     uploadAvatar,
     deleteAvatar,
@@ -150,12 +154,12 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               className="shadow-xs ring-1 ring-black/5"
             />
 
-            {/* GitHub 风格：位于头像左下角的圆形修改按钮 */}
+            {/* GitHub 风格：位于头像右下角的圆形修改按钮 */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
+              className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
               title="修改头像 (点击上传图片)"
               aria-label="修改头像"
             >
@@ -173,6 +177,7 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               <h2 className="truncate text-base font-bold text-foreground">
                 {displayName}
               </h2>
+              <GenderBadge gender={gender} />
               {!isEditing && (
                 <button
                   onClick={handleStartEdit}
@@ -202,6 +207,27 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                 )}
               </button>
             </div>
+
+            {/* 所属组织（OA 身份属性只读标签；公网 Logto 用户隐藏） */}
+            {departments.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {departments.map((dept) => (
+                  <span
+                    key={dept.id}
+                    title={dept.is_main ? `${dept.name}（主部门）` : dept.name}
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1",
+                      dept.is_main
+                        ? "bg-primary/10 text-primary-deep ring-primary/20"
+                        : "bg-gray-100 text-muted ring-gray-200"
+                    )}
+                  >
+                    <Building2 className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{dept.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
 
             {avatarUrl ? (
               <div className="mt-2 flex items-center gap-2">

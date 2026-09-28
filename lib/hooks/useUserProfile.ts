@@ -164,6 +164,8 @@ export function useUserProfile() {
     avatarUrl: profile?.avatar_url || null,
     nickname: profile?.nickname || null,
     bio: profile?.bio || null,
+    gender: profile?.gender ?? null,
+    departments: profile?.departments ?? [],
     isLoading,
     error,
     refreshProfile,
