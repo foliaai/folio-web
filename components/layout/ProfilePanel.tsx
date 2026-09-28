@@ -14,9 +14,11 @@ import {
   LogOut,
   Sparkles,
   Loader2,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { genderText } from "@/lib/api/user";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -41,6 +43,8 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
     avatarUrl,
     nickname,
     bio,
+    gender,
+    departments,
     isLoading,
     uploadAvatar,
     deleteAvatar,
@@ -64,6 +68,9 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
   const displayBio =
     bio ||
     "暂无个人简介。点击编辑按钮添加简介，介绍您的工作或研究方向。";
+
+  // 身份属性（OA 同步，只读展示；空值整体隐藏，公网 Logto 用户无部门）
+  const genderLabel = genderText(gender);
 
   const handleStartEdit = () => {
     setEditName(nickname || user?.name || "");
@@ -202,6 +209,32 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                 )}
               </button>
             </div>
+
+            {/* 所属组织与性别（OA 身份属性，只读；空值隐藏） */}
+            {(departments.length > 0 || genderLabel) && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {departments.map((dept) => (
+                  <span
+                    key={dept.id}
+                    title={dept.is_main ? `${dept.name}（主部门）` : dept.name}
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1",
+                      dept.is_main
+                        ? "bg-primary/10 text-primary-deep ring-primary/20"
+                        : "bg-gray-100 text-muted ring-gray-200"
+                    )}
+                  >
+                    <Building2 className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{dept.name}</span>
+                  </span>
+                ))}
+                {genderLabel && (
+                  <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 ring-gray-200">
+                    {genderLabel}
+                  </span>
+                )}
+              </div>
+            )}
 
             {avatarUrl ? (
               <div className="mt-2 flex items-center gap-2">

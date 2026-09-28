@@ -7,15 +7,33 @@
 
 import { authApiUrl, getCommonHeaders } from "@/lib/config";
 
+/** 所属组织条目（auth-server organization 表，扁平无层级） */
+export interface UserDepartmentItem {
+  id: number;
+  name: string;
+  is_main: boolean;
+}
+
 export interface UserProfileData {
   user_id: string;
   nickname?: string | null;
   role?: string | null;
   avatar_url?: string | null;
   bio?: string | null;
+  /** 性别：1=男，2=女，0/null=未知（OA 身份属性，每次登录以 OA 刷新） */
+  gender?: number | null;
+  /** 所属组织（主部门在前；公网 Logto 用户为空数组） */
+  departments?: UserDepartmentItem[] | null;
   custom_data?: Record<string, any> | null;
   created_at?: string | null;
   updated_at?: string | null;
+}
+
+/** 性别展示文案（0/null 未知返回 null，调用方隐藏） */
+export function genderText(gender?: number | null): string | null {
+  if (gender === 1) return "男";
+  if (gender === 2) return "女";
+  return null;
 }
 
 export interface UserProfileResponse {

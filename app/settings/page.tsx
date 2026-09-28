@@ -26,9 +26,11 @@ import {
   ChevronDown,
   HardDrive,
   Terminal,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { genderText } from "@/lib/api/user";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -71,6 +73,8 @@ export default function SettingsPage() {
     avatarUrl,
     nickname,
     bio,
+    gender,
+    departments,
     isLoading: isProfileLoading,
     uploadAvatar,
     deleteAvatar,
@@ -593,6 +597,47 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* 所属组织（OA 身份属性，只读，随登录自动刷新；公网用户无此数据时隐藏） */}
+                  {departments.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1.5">
+                        所属组织（OA 同步）
+                      </label>
+                      <div className="flex max-w-md flex-wrap items-center gap-1.5">
+                        {departments.map((dept) => (
+                          <span
+                            key={dept.id}
+                            title={dept.is_main ? `${dept.name}（主部门）` : dept.name}
+                            className={cn(
+                              "inline-flex max-w-full items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs ring-1",
+                              dept.is_main
+                                ? "bg-primary/10 text-primary-deep ring-primary/20 font-medium"
+                                : "bg-gray-50 text-muted ring-gray-200"
+                            )}
+                          >
+                            <Building2 className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{dept.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 性别（OA 身份属性，只读；未知/未提供时隐藏） */}
+                  {genderText(gender) && (
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1.5">
+                        性别（OA 同步）
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={genderText(gender) || ""}
+                        className="w-full max-w-md rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-muted cursor-default focus:outline-hidden"
+                      />
+                    </div>
+                  )}
 
                   {profileMsg && (
                     <div
