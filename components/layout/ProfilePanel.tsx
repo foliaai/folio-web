@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { genderText } from "@/lib/api/user";
+import { GenderBadge } from "@/components/ui/GenderBadge";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -68,9 +68,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
   const displayBio =
     bio ||
     "暂无个人简介。点击编辑按钮添加简介，介绍您的工作或研究方向。";
-
-  // 身份属性（OA 同步，只读展示；空值整体隐藏，公网 Logto 用户无部门）
-  const genderLabel = genderText(gender);
 
   const handleStartEdit = () => {
     setEditName(nickname || user?.name || "");
@@ -172,6 +169,9 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                 <Camera className="h-3.5 w-3.5" />
               )}
             </button>
+
+            {/* 性别标志（♂/♀ 角标；未知不显示） */}
+            <GenderBadge gender={gender} className="absolute -bottom-1 -right-1" />
           </div>
 
           {/* 用户信息与名称 */}
@@ -210,8 +210,8 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               </button>
             </div>
 
-            {/* 所属组织与性别（OA 身份属性，只读；空值隐藏） */}
-            {(departments.length > 0 || genderLabel) && (
+            {/* 所属组织（OA 身份属性只读标签；公网 Logto 用户隐藏） */}
+            {departments.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {departments.map((dept) => (
                   <span
@@ -228,11 +228,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                     <span className="truncate">{dept.name}</span>
                   </span>
                 ))}
-                {genderLabel && (
-                  <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 ring-gray-200">
-                    {genderLabel}
-                  </span>
-                )}
               </div>
             )}
 

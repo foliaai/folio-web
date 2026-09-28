@@ -10,7 +10,6 @@ import {
   Check,
   Copy,
   Camera,
-  RotateCcw,
   ShieldCheck,
   LogOut,
   RefreshCw,
@@ -30,7 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { genderText } from "@/lib/api/user";
+import { GenderBadge } from "@/components/ui/GenderBadge";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -77,7 +76,6 @@ export default function SettingsPage() {
     departments,
     isLoading: isProfileLoading,
     uploadAvatar,
-    deleteAvatar,
     updateProfile,
     refreshProfile,
   } = useUserProfile();
@@ -253,8 +251,7 @@ export default function SettingsPage() {
     setProfileMsg(null);
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = async () => {
     if (!isEditingProfile) return;
     setIsSavingProfile(true);
     setProfileMsg(null);
@@ -284,17 +281,6 @@ export default function SettingsPage() {
       setTimeout(() => setProfileMsg(null), 3000);
     } catch (err: any) {
       setProfileMsg({ type: "error", text: err?.message || "上传头像失败" });
-    }
-  };
-
-  const handleResetAvatar = async () => {
-    setProfileMsg(null);
-    try {
-      await deleteAvatar();
-      setProfileMsg({ type: "success", text: "已重置为默认品牌字符徽章" });
-      setTimeout(() => setProfileMsg(null), 3000);
-    } catch (err: any) {
-      setProfileMsg({ type: "error", text: err?.message || "重置头像失败" });
     }
   };
 
@@ -441,21 +427,24 @@ export default function SettingsPage() {
             {/* ==================== 1. 个人资料面板 ==================== */}
             {activeTab === "profile" && (
               <div className="space-y-6">
-                {/* 用户身份与头像卡片 */}
+                {/* 身份卡：头像（相机换图 + 性别角标）+ 昵称 + 用户 ID + 简介（昵称/简介可编辑） */}
                 <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-xs">
-                  <h2 className="text-sm font-bold text-foreground">个人身份与头像</h2>
-                  <p className="mt-1 text-xs text-muted">
-                    管理您在系统中的显示形象，头像支持上传高清图片并自动同步保存至 MinIO 对象存储。
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-bold text-foreground">个人身份与头像</h2>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary-deep ring-1 ring-primary/20">
+                      <ShieldCheck className="h-3 w-3" />
+                      账号已登录
+                    </span>
+                  </div>
 
-                  <div className="mt-6 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
-                    {/* 头像区域（左下角修改徽标交互） */}
+                  <div className="mt-5 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+                    {/* 头像区域：左下角相机修改徽标 + 右下角性别标志 */}
                     <div className="relative shrink-0">
                       <UserAvatar
                         userId={userId}
                         avatarUrl={avatarUrl}
                         name={formName || user?.name || user?.username}
-                        size={64}
+                        size={72}
                         shape="rounded-2xl"
                         className="shadow-sm ring-1 ring-black/5"
                       />
@@ -475,174 +464,103 @@ export default function SettingsPage() {
                           <Camera className="h-3.5 w-3.5" />
                         )}
                       </button>
+
+                      {/* 性别标志（♂/♀ 角标；未知不显示） */}
+                      <GenderBadge gender={gender} className="absolute -bottom-1 -right-1" />
                     </div>
 
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={isProfileLoading}
-                          className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-gray-50 hover:border-gray-300"
-                        >
-                          上传新图片
-                        </button>
-                        {avatarUrl && (
+                    <div className="min-w-0 flex-1">
+                      {/* 昵称（可编辑） */}
+                      {isEditingProfile ? (
+                        <input
+                          type="text"
+                          value={formName}
+                          onChange={(e) => setFormName(e.target.value)}
+                          maxLength={30}
+                          className="w-full max-w-md rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-sm text-foreground transition-colors placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
+                          placeholder="设置您的称呼"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-base font-bold text-foreground">
+                            {formName ||
+                              user?.name ||
+                              user?.username ||
+                              (userId ? `用户 ${userId.slice(0, 8)}` : "未命名用户")}
+                          </h3>
                           <button
                             type="button"
-                            onClick={handleResetAvatar}
-                            disabled={isProfileLoading}
-                            className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                            onClick={handleStartEditProfile}
+                            className="p-1 text-muted hover:text-primary transition-colors"
+                            title="编辑昵称与简介"
+                            aria-label="编辑昵称与简介"
                           >
-                            <RotateCcw className="h-3 w-3" />
-                            <span>恢复默认徽章</span>
+                            <Edit2 className="h-3.5 w-3.5" />
                           </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-subtle">
-                        支持 JPG、PNG、WEBP、GIF 或 SVG 格式，上传后自动等比缩放为 WebP 高清图。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 个人资料表单 */}
-                <form onSubmit={handleSaveProfile} className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-xs space-y-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-sm font-bold text-foreground">基本资料</h2>
-                      <p className="mt-1 text-xs text-muted">
-                        默认只读。需要改昵称或简介时，先点「修改」。
-                      </p>
-                    </div>
-                    {!isEditingProfile ? (
-                      <button
-                        type="button"
-                        onClick={handleStartEditProfile}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        <Edit2 className="h-3.5 w-3.5 text-muted" />
-                        修改
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1.5">
-                      昵称 / 显示名称
-                    </label>
-                    <input
-                      type="text"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      maxLength={30}
-                      readOnly={!isEditingProfile}
-                      className={cn(
-                        "w-full max-w-md rounded-xl border px-3.5 py-2 text-xs text-foreground transition-colors",
-                        isEditingProfile
-                          ? "border-gray-300 bg-white placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
-                          : "cursor-default border-gray-200 bg-gray-50 text-muted focus:outline-hidden"
+                        </div>
                       )}
-                      placeholder={isEditingProfile ? "设置您的称呼" : "未设置昵称"}
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1.5">
-                      个人简介 / 签名
-                    </label>
-                    <textarea
-                      value={formBio}
-                      onChange={(e) => setFormBio(e.target.value)}
-                      rows={3}
-                      maxLength={200}
-                      readOnly={!isEditingProfile}
-                      className={cn(
-                        "w-full max-w-md rounded-xl border px-3.5 py-2 text-xs text-foreground resize-none transition-colors",
-                        isEditingProfile
-                          ? "border-gray-300 bg-white placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
-                          : "cursor-default border-gray-200 bg-gray-50 text-muted focus:outline-hidden"
-                      )}
-                      placeholder={isEditingProfile ? "介绍一下您的工作领域或研究兴趣..." : "未填写简介"}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1.5">
-                      用户标识 (User ID)
-                    </label>
-                    <div className="flex max-w-md items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={userId}
-                        className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 font-mono text-xs text-muted cursor-default focus:outline-hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCopyUserId}
-                        className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-gray-50"
-                      >
-                        {copiedId ? (
-                          <>
-                            <Check className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-primary-deep font-semibold">已复制</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5 text-muted" />
-                            <span>复制</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 所属组织（OA 身份属性，只读，随登录自动刷新；公网用户无此数据时隐藏） */}
-                  {departments.length > 0 && (
-                    <div>
-                      <label className="block text-xs font-medium text-foreground mb-1.5">
-                        所属组织
-                      </label>
-                      <div className="flex max-w-md flex-wrap items-center gap-1.5">
-                        {departments.map((dept) => (
-                          <span
-                            key={dept.id}
-                            title={dept.is_main ? `${dept.name}（主部门）` : dept.name}
-                            className={cn(
-                              "inline-flex max-w-full items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs ring-1",
-                              dept.is_main
-                                ? "bg-primary/10 text-primary-deep ring-primary/20 font-medium"
-                                : "bg-gray-50 text-muted ring-gray-200"
-                            )}
-                          >
-                            <Building2 className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{dept.name}</span>
-                          </span>
-                        ))}
+                      {/* 用户 ID 与复制 */}
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-muted-subtle">ID:</span>
+                        <span className="font-mono text-xs text-muted truncate">{userId}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyUserId}
+                          className="p-0.5 text-muted hover:text-foreground transition-colors"
+                          title="复制用户 ID"
+                        >
+                          {copiedId ? (
+                            <Check className="h-3 w-3 text-primary" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
                       </div>
-                    </div>
-                  )}
 
-                  {/* 性别（OA 身份属性，只读；未知/未提供时隐藏） */}
-                  {genderText(gender) && (
-                    <div>
-                      <label className="block text-xs font-medium text-foreground mb-1.5">
-                        性别
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={genderText(gender) || ""}
-                        className="w-full max-w-md rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-muted cursor-default focus:outline-hidden"
-                      />
+                      {/* 个人简介（可编辑） */}
+                      {isEditingProfile ? (
+                        <div className="mt-3 space-y-3">
+                          <textarea
+                            value={formBio}
+                            onChange={(e) => setFormBio(e.target.value)}
+                            rows={3}
+                            maxLength={200}
+                            className="w-full max-w-md rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs text-foreground resize-none transition-colors placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
+                            placeholder="介绍一下您的工作领域或研究兴趣..."
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditProfile}
+                              disabled={isSavingProfile}
+                              className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              取消
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveProfile}
+                              disabled={isSavingProfile}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-primary-light disabled:opacity-50"
+                            >
+                              {isSavingProfile && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                              <span>保存资料</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs leading-relaxed text-muted whitespace-pre-wrap">
+                          {formBio || "暂无简介"}
+                        </p>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {profileMsg && (
                     <div
                       className={cn(
-                        "rounded-xl px-3.5 py-2 text-xs flex items-center gap-2",
+                        "mt-4 rounded-xl px-3.5 py-2 text-xs flex items-center gap-2",
                         profileMsg.type === "success"
                           ? "bg-primary/10 text-primary-deep border border-primary/20"
                           : "bg-red-50 text-red-600 border border-red-200"
@@ -656,36 +574,31 @@ export default function SettingsPage() {
                       <span>{profileMsg.text}</span>
                     </div>
                   )}
+                </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary-deep ring-1 ring-primary/20">
-                        <ShieldCheck className="h-3 w-3" />
-                        账号已登录
-                      </span>
+                {/* 组织信息（公网用户无部门时整卡隐藏） */}
+                {departments.length > 0 && (
+                  <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-xs">
+                    <h2 className="text-sm font-bold text-foreground">所属组织</h2>
+                    <div className="mt-4 flex max-w-md flex-wrap items-center gap-2">
+                      {departments.map((dept) => (
+                        <span
+                          key={dept.id}
+                          title={dept.is_main ? `${dept.name}（主部门）` : dept.name}
+                          className={cn(
+                            "inline-flex max-w-full items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs ring-1",
+                            dept.is_main
+                              ? "bg-primary/10 text-primary-deep ring-primary/20 font-medium"
+                              : "bg-gray-50 text-muted ring-gray-200"
+                          )}
+                        >
+                          <Building2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{dept.name}</span>
+                        </span>
+                      ))}
                     </div>
-                    {isEditingProfile ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleCancelEditProfile}
-                          disabled={isSavingProfile}
-                          className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          取消
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSavingProfile}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-primary-light disabled:opacity-50"
-                        >
-                          {isSavingProfile && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          <span>保存资料</span>
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
-                </form>
+                )}
 
                 {/* 账号安全与退出 */}
                 <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
