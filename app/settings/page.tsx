@@ -602,7 +602,7 @@ export default function SettingsPage() {
                   {departments.length > 0 && (
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1.5">
-                        所属组织（OA 同步）
+                        所属组织
                       </label>
                       <div className="flex max-w-md flex-wrap items-center gap-1.5">
                         {departments.map((dept) => (
@@ -628,7 +628,7 @@ export default function SettingsPage() {
                   {genderText(gender) && (
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1.5">
-                        性别（OA 同步）
+                        性别
                       </label>
                       <input
                         type="text"
