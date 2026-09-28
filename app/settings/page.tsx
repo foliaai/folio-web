@@ -449,12 +449,12 @@ export default function SettingsPage() {
                         className="shadow-sm ring-1 ring-black/5"
                       />
 
-                      {/* GitHub 风格左下角相机修改徽标 */}
+                      {/* GitHub 风格右下角相机修改徽标 */}
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isProfileLoading}
-                        className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
+                        className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
                         title="更换头像"
                         aria-label="更换头像"
                       >
@@ -464,22 +464,22 @@ export default function SettingsPage() {
                           <Camera className="h-3.5 w-3.5" />
                         )}
                       </button>
-
-                      {/* 性别标志（♂/♀ 角标；未知不显示） */}
-                      <GenderBadge gender={gender} className="absolute -bottom-1 -right-1" />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      {/* 昵称（可编辑） */}
+                      {/* 昵称（可编辑）+ 性别标志 */}
                       {isEditingProfile ? (
-                        <input
-                          type="text"
-                          value={formName}
-                          onChange={(e) => setFormName(e.target.value)}
-                          maxLength={30}
-                          className="w-full max-w-md rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-sm text-foreground transition-colors placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
-                          placeholder="设置您的称呼"
-                        />
+                        <div className="flex w-full max-w-md items-center gap-2">
+                          <input
+                            type="text"
+                            value={formName}
+                            onChange={(e) => setFormName(e.target.value)}
+                            maxLength={30}
+                            className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-sm text-foreground transition-colors placeholder-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden"
+                            placeholder="设置您的称呼"
+                          />
+                          <GenderBadge gender={gender} size={20} />
+                        </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <h3 className="truncate text-base font-bold text-foreground">
@@ -488,6 +488,7 @@ export default function SettingsPage() {
                               user?.username ||
                               (userId ? `用户 ${userId.slice(0, 8)}` : "未命名用户")}
                           </h3>
+                          <GenderBadge gender={gender} size={20} />
                           <button
                             type="button"
                             onClick={handleStartEditProfile}

@@ -154,12 +154,12 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               className="shadow-xs ring-1 ring-black/5"
             />
 
-            {/* GitHub 风格：位于头像左下角的圆形修改按钮 */}
+            {/* GitHub 风格：位于头像右下角的圆形修改按钮 */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
+              className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm transition-all hover:scale-110 hover:bg-primary hover:text-white hover:border-primary cursor-pointer"
               title="修改头像 (点击上传图片)"
               aria-label="修改头像"
             >
@@ -169,9 +169,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                 <Camera className="h-3.5 w-3.5" />
               )}
             </button>
-
-            {/* 性别标志（♂/♀ 角标；未知不显示） */}
-            <GenderBadge gender={gender} className="absolute -bottom-1 -right-1" />
           </div>
 
           {/* 用户信息与名称 */}
@@ -180,6 +177,7 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
               <h2 className="truncate text-base font-bold text-foreground">
                 {displayName}
               </h2>
+              <GenderBadge gender={gender} size={20} />
               {!isEditing && (
                 <button
                   onClick={handleStartEdit}
