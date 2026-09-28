@@ -5,14 +5,12 @@ import Link from "next/link";
 import {
   X,
   Camera,
-  RotateCcw,
   Check,
   Copy,
   Edit2,
   Settings,
   HelpCircle,
   LogOut,
-  Sparkles,
   Loader2,
   Building2,
 } from "lucide-react";
@@ -47,7 +45,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
     departments,
     isLoading,
     uploadAvatar,
-    deleteAvatar,
     updateProfile,
   } = useUserProfile();
 
@@ -108,17 +105,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
       setTimeout(() => setStatusMsg(null), 3000);
     } catch (err: any) {
       setStatusMsg({ type: "error", text: err?.message || "头像上传失败" });
-    }
-  };
-
-  const handleResetAvatar = async () => {
-    setStatusMsg(null);
-    try {
-      await deleteAvatar();
-      setStatusMsg({ type: "success", text: "已重置为默认品牌字符徽章" });
-      setTimeout(() => setStatusMsg(null), 3000);
-    } catch (err: any) {
-      setStatusMsg({ type: "error", text: err?.message || "重置头像失败" });
     }
   };
 
@@ -228,24 +214,6 @@ export function ProfilePanel({ onNavigate, className }: ProfilePanelProps) {
                 ))}
               </div>
             )}
-
-            {avatarUrl ? (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary-deep ring-1 ring-primary/20">
-                  <Sparkles className="h-2.5 w-2.5" />
-                  自定义头像
-                </span>
-                <button
-                  onClick={handleResetAvatar}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-0.5 text-[10px] text-muted hover:text-red-600 transition-colors"
-                  title="恢复默认头像"
-                >
-                  <RotateCcw className="h-2.5 w-2.5" />
-                  恢复默认
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 

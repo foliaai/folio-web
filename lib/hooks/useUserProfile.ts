@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentUserId } from "@/lib/config";
 import {
-  deleteUserAvatar,
   getUserProfile,
   updateUserProfile,
   uploadUserAvatar,
@@ -113,28 +112,6 @@ export function useUserProfile() {
     [profile, userId]
   );
 
-  // 删除头像（重置为 Identicon）
-  const handleDeleteAvatar = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await deleteUserAvatar();
-      const updated: UserProfileData = {
-        ...(profile || { user_id: userId }),
-        avatar_url: null,
-        updated_at: new Date().toISOString(),
-      };
-      setProfile(updated);
-      notifyListeners(updated);
-    } catch (err: any) {
-      const msg = err?.message || "重置头像失败";
-      setError(msg);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [profile, userId]);
-
   // 更新资料（昵称、简介）
   const handleUpdateProfile = useCallback(
     async (data: { nickname?: string; bio?: string }) => {
@@ -170,7 +147,6 @@ export function useUserProfile() {
     error,
     refreshProfile,
     uploadAvatar: handleUploadAvatar,
-    deleteAvatar: handleDeleteAvatar,
     updateProfile: handleUpdateProfile,
   };
 }

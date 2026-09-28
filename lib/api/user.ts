@@ -107,6 +107,7 @@ export async function updateUserProfile(payload: {
 
 /**
  * 上传自定义头像（folio-auth-server：MinIO + avatar_url）
+ * 上传成功会自动替换旧头像（MinIO 旧对象同步清理），无独立"恢复默认"入口。
  */
 export async function uploadUserAvatar(file: File): Promise<string> {
   const url = authApiUrl("/user/avatar");
@@ -134,22 +135,4 @@ export async function uploadUserAvatar(file: File): Promise<string> {
 
   const json: AvatarUploadResponse = await res.json();
   return json.data.avatar_url;
-}
-
-/**
- * 删除自定义头像（重置为默认 Identicon）
- */
-export async function deleteUserAvatar(): Promise<void> {
-  const url = authApiUrl("/user/avatar");
-  const headers = getCommonHeaders();
-
-  const res = await fetch(url, {
-    method: "DELETE",
-    headers,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`删除头像失败 (${res.status}): ${errText}`);
-  }
 }
