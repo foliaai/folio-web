@@ -73,6 +73,7 @@ const FOLIA_BRAND: BrandConfig = {
   // GitHub 组织头像原图（256px，白底），本地化存放避免外链
   logoUrl: "/brand/foliaai.png",
   logoStyle: "chip",
+  slogan: "以知识为源，让效率生长",
 };
 
 export function getBrandConfig(): BrandConfig {
