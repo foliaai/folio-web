@@ -24,14 +24,16 @@ export interface FeatureConfig {
  * 侧栏导航特性清单（唯一事实源）。
  *
  * 当前开放策略：
- *   - 首页 / Agent应用：始终锁定（敬请期待），登录后也不解锁
+ *   - 首页 / 智能体：始终锁定（敬请期待），登录后也不解锁
  *   - 知识库 / 技能：登录前锁定，登录后解锁
+ *
+ * 顺序与移动端底栏一致（首页/知识库/技能/智能体）；label 两端部署统一，不随品牌变化。
  */
 export const FEATURES: FeatureConfig[] = [
   { key: "home", label: "首页", href: "/", icon: Home, locked: true },
-  { key: "agents", label: "Agent应用", href: "/agents", icon: Bot, locked: true },
   { key: "knowledge", label: "知识库", href: "/knowledge", icon: Library, requiresAuth: true },
   { key: "skills", label: "技能", href: "/skills", icon: Sparkle, requiresAuth: true },
+  { key: "agents", label: "智能体", href: "/agents", icon: Bot, locked: true },
 ];
 
 export function isFeatureAccessible(
