@@ -2803,39 +2803,24 @@ function ModelCapabilityIcons({ model }: { model: ChatModelItem }) {
   );
 }
 
-const SELECTED_MODEL_STORAGE_PREFIX = "knowledge-chat-selected-model-v2";
+/** 按模型记忆用户上次使用的思考档位（模型列表里展示"上次用的是什么档"） */
+const MODEL_LEVEL_STORAGE_PREFIX = "knowledge-chat-model-level-v1";
 
-function selectedModelStorageKey(
-  knowledgeBaseId: string | null,
-  folderId: string | null,
-): string {
-  return `${SELECTED_MODEL_STORAGE_PREFIX}:${knowledgeBaseId ?? "__none__"}:${folderId ?? "__kb__"}`;
-}
-
-function getLastSelectedModel(
-  knowledgeBaseId: string | null,
-  folderId: string | null,
-): string | null {
-  if (typeof window === "undefined" || !knowledgeBaseId) return null;
+function getLastModelLevel(modelId: string): string | null {
+  if (typeof window === "undefined" || !modelId) return null;
   try {
-    return window.localStorage.getItem(
-      selectedModelStorageKey(knowledgeBaseId, folderId),
-    );
+    return window.localStorage.getItem(`${MODEL_LEVEL_STORAGE_PREFIX}:${modelId}`);
   } catch {
     return null;
   }
 }
 
-function setLastSelectedModel(
-  knowledgeBaseId: string | null,
-  folderId: string | null,
-  modelId: string,
-): void {
-  if (typeof window === "undefined" || !knowledgeBaseId || !modelId) return;
+function setLastModelLevel(modelId: string, level: string): void {
+  if (typeof window === "undefined" || !modelId || !level) return;
   try {
     window.localStorage.setItem(
-      selectedModelStorageKey(knowledgeBaseId, folderId),
-      modelId,
+      `${MODEL_LEVEL_STORAGE_PREFIX}:${modelId}`,
+      level,
     );
   } catch {
     // ignore
@@ -2846,6 +2831,22 @@ function applyModelSelection(
   settings: ChatSettings,
   model: ChatModelItem,
 ): ChatSettings {
+  // 按模型记忆优先：用过该模型则直接沿用上次的档位（含开关模型的 Off）
+  const remembered = getLastModelLevel(model.id);
+  if (
+    model.supports_thinking === true &&
+    remembered &&
+    model.thinking_levels?.includes(remembered)
+  ) {
+    return {
+      ...settings,
+      model: model.id,
+      thinkingLevel: remembered,
+      enableMultimodal: model.supports_multimodal === true,
+    };
+  }
+
+  // 无记忆时的默认推导（开关模型最终落到 medium，即默认 On）
   const lastLevel = getSettingsDefaultThinkingLevel();
   let nextThinkingLevel = "off";
   if (model.supports_thinking === true) {
@@ -2918,6 +2919,14 @@ function UnifiedModelPicker({
   const [placement, setPlacement] = useState<"right" | "left">("right");
   const containerRef = useRef<HTMLDivElement>(null);
   const firstCardRef = useRef<HTMLDivElement>(null);
+
+  // 按模型记忆当前档位：模型列表里每个模型展示"上次使用"的档（开关模型
+  // 显示 On/Off），切回该模型时即可看到并沿用之前的设置
+  useEffect(() => {
+    if (modelId && thinkingLevel) {
+      setLastModelLevel(modelId, thinkingLevel);
+    }
+  }, [modelId, thinkingLevel]);
 
   // 关闭主浮层时，同时重置子面板和搜索输入
   useEffect(() => {
@@ -3249,15 +3258,28 @@ function UnifiedModelPicker({
                 ) : (
                   displayedModels.map((m) => {
                     const isSelected = m.id === modelId;
-                    // 只有支持强度的模型才展示默认/当前强度。开关模型的
-                    // ``medium`` 是内部的“开”哨兵，不能被误展示为 Medium。
-                    const effortText = isEffortThinking(m.thinking_levels)
-                      ? (EFFORT_LEVEL_TITLES[
-                          isSelected
-                            ? thinkingLevel
-                            : m.default_thinking_level || "medium"
-                        ] ?? (isSelected ? thinkingLevel : "Medium"))
-                      : null;
+                    // 档位角标：选中的模型显示当前档；未选中的显示该模型
+                    // 上次使用的档（无记忆时回退模型默认档）。
+                    // 开关模型（仅 off/medium 两档）统一显示英文 On/Off——
+                    // ``medium`` 是内部的「开」哨兵，不能被误展示为 Medium；
+                    // 强度模型显示档位标题，Off 档不展示角标（保持原行为）。
+                    const toggleModel = !isEffortThinking(m.thinking_levels);
+                    const remembered = isSelected
+                      ? null
+                      : getLastModelLevel(m.id);
+                    // 开关模型无记忆时默认 On（显式回退 medium，不依赖
+                    // 后端 default）；强度模型回退模型默认档
+                    const activeLevel = isSelected
+                      ? thinkingLevel
+                      : toggleModel
+                        ? (remembered ?? "medium")
+                        : (remembered ?? (m.default_thinking_level || "medium"));
+                    const effortText = toggleModel
+                      ? activeLevel === "off"
+                        ? "Off"
+                        : "On"
+                      : (EFFORT_LEVEL_TITLES[activeLevel] ??
+                        (isSelected ? thinkingLevel : "Medium"));
 
                     return (
                       <button
@@ -3285,7 +3307,8 @@ function UnifiedModelPicker({
                           >
                             {m.label}
                           </span>
-                          {effortText && effortText !== "Off" ? (
+                          {effortText &&
+                          (toggleModel || effortText !== "Off") ? (
                             <span className="shrink-0 text-[11px] text-neutral-400 font-normal">
                               {effortText}
                             </span>
@@ -3972,8 +3995,6 @@ export const KnowledgeChatPanel = ({
 
     const inList = (id: string) => models.some((m) => m.id === id);
     const sessionModel = activeSession.model || "";
-    const localModel =
-      getLastSelectedModel(knowledgeBaseId, selectedFolderId) || "";
     const settingsModel = pickSettingsDefaultModel(models);
     const firstAvailable = models[0].id;
     const isFreshSession =
@@ -3992,19 +4013,14 @@ export const KnowledgeChatPanel = ({
           nextModel = settingsModel || firstAvailable;
         }
       } else if (switchedSession) {
-        nextModel = inList(localModel)
-          ? localModel
-          : inList(sessionModel)
-            ? sessionModel
-            : firstAvailable;
+        // 切换 session：延续该会话上次使用的模型（利于上游缓存命中）；
+        // 会话无显式模型（走 preset 的旧会话）或已下线时回落列表首个
+        nextModel = inList(sessionModel) ? sessionModel : firstAvailable;
       } else {
-        // 同一 session 内（含刷新恢复）：优先级 prev.model → localModel →
-        // sessionModel → firstAvailable。localModel 必须独立检查，否则
-        // sessionModel 为空 / 已下线时会直接跳到 firstAvailable，丢掉本地偏好。
+        // 同一 session 内（含刷新恢复）：优先级 prev.model → sessionModel →
+        // firstAvailable
         if (prev.model && inList(prev.model)) {
           nextModel = prev.model;
-        } else if (inList(localModel)) {
-          nextModel = localModel;
         } else if (inList(sessionModel)) {
           nextModel = sessionModel;
         } else {
@@ -4043,14 +4059,6 @@ export const KnowledgeChatPanel = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.session_id, knowledgeBaseId, selectedFolderId, models]);
-
-  // 后端在发送时才写入会话偏好；这里覆盖“刚选完就刷新”的本地恢复窗口。
-  // 必须跳过空 model：刷新首帧 settings.model 还是 ""，若写入会覆盖之前保存的
-  // 偏好，导致 restore 读到空串、回落到 models[0]（即 deepseek-v4-flash）。
-  useEffect(() => {
-    if (!settings.model) return;
-    setLastSelectedModel(knowledgeBaseId, selectedFolderId, settings.model);
-  }, [knowledgeBaseId, selectedFolderId, settings.model]);
 
   // 检测用户是否在底部（阈值 60px）
   const handleScroll = useCallback(() => {
@@ -4139,6 +4147,8 @@ export const KnowledgeChatPanel = ({
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
+      // 模型/档位的 session 级恢复由下方 activeSession 同步 effect 统一处理
+      // （session 记忆优先于 kb 级记忆），这里只重置交互模式
       setSettings((prev) => ({ ...prev, interactionMode: "agent" }));
       inputMultilineRef.current = false;
       setInputMultiline(false);
