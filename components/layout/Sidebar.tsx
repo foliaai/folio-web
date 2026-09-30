@@ -78,7 +78,7 @@ export const Sidebar = () => {
 
   const itemClass = (isActive: boolean) =>
     cn(
-      "relative flex w-[72px] flex-col items-center gap-1.5 rounded-lg py-2.5 transition-all",
+      "relative flex w-[62px] flex-col items-center gap-1.5 rounded-lg py-2.5 transition-all",
       isActive ? "bg-primary/20" : "hover:bg-primary/10"
     );
 
@@ -94,7 +94,7 @@ export const Sidebar = () => {
   return (
     <>
       {/* 桌面端侧边栏 (md 及以上显示)：图标 + 名称常驻，全部按钮一组置顶 */}
-      <aside className="fixed left-0 top-0 z-[1000] hidden h-screen w-[84px] flex-col items-center bg-dark-card py-5 md:flex">
+      <aside className="fixed left-0 top-0 z-[1000] hidden h-screen w-[72px] flex-col items-center bg-dark-card py-5 md:flex">
         {/* 用户头像（点击开个人空间抽屉；未登录去登录页） */}
         <button
           onClick={handleAvatarClick}
@@ -197,7 +197,7 @@ export const Sidebar = () => {
             <button
               onClick={logout}
               className={cn(
-                "relative flex w-[72px] flex-col items-center gap-1.5 rounded-lg py-2.5 transition-all hover:bg-red-500/10 cursor-pointer"
+                "relative flex w-[62px] flex-col items-center gap-1.5 rounded-lg py-2.5 transition-all hover:bg-red-500/10 cursor-pointer"
               )}
               aria-label="退出"
             >
