@@ -213,11 +213,17 @@ export function UploadTasksProvider({ children }: { children: ReactNode }) {
             if (task.status !== "indexing" || !task.fileId) return task;
             const matched = statusMap.get(task.fileId);
             if (!matched) return task;
-            if (matched.status === "success") {
+            // 与页面 mergeProgress 同规则：前台进度(progress>=1)已走完但
+            // status 仍 processing（后台摘要/图谱阶段未结束）即视为完成
+            const normalized =
+              matched.progress >= 1 && matched.status === "processing"
+                ? "success"
+                : matched.status;
+            if (normalized === "success") {
               changed = true;
               return { ...task, status: "completed" as const, progress: 1 };
             }
-            if (matched.status === "failed") {
+            if (normalized === "failed") {
               changed = true;
               return {
                 ...task,
