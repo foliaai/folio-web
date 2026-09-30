@@ -2803,7 +2803,6 @@ function ModelCapabilityIcons({ model }: { model: ChatModelItem }) {
   );
 }
 
-const RECENT_MODELS_STORAGE_KEY = "knowledge-chat-recent-models";
 const SELECTED_MODEL_STORAGE_PREFIX = "knowledge-chat-selected-model-v2";
 
 function selectedModelStorageKey(
@@ -2837,32 +2836,6 @@ function setLastSelectedModel(
     window.localStorage.setItem(
       selectedModelStorageKey(knowledgeBaseId, folderId),
       modelId,
-    );
-  } catch {
-    // ignore
-  }
-}
-
-function getRecentModelIds(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(RECENT_MODELS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function recordRecentModelId(modelId: string): void {
-  if (typeof window === "undefined" || !modelId) return;
-  try {
-    const list = getRecentModelIds().filter((id) => id !== modelId);
-    list.unshift(modelId);
-    window.localStorage.setItem(
-      RECENT_MODELS_STORAGE_KEY,
-      JSON.stringify(list.slice(0, 20)),
     );
   } catch {
     // ignore
@@ -2920,7 +2893,7 @@ const EFFORT_LEVEL_TITLES: Record<string, string> = {
  * 统一模型与思考强度选择器（Cursor 风格分步展开双卡片）
  * 交互逻辑：
  *   1. 触发按钮：点击时仅在正上方弹出当前模型信息主卡片（Effort 档位 + Model 项）。
- *   2. 点击主卡片中的 Model 项后，才展开第二张卡片（展示所有模型信息，默认精简展示常用的 10 个模型）。
+ *   2. 点击主卡片中的 Model 项后，才展开第二张卡片（展示所有模型，顺序为后端分组排序）。
  *   3. 思考强度记忆：默认思考强度根据用户上次选择的强度来定义（并在 localStorage 中持久化）。
  *   4. 自适应方向：第二张卡片默认在右侧显示，若右侧屏幕空间不足则自动切换到左侧显示。
  */
@@ -3034,7 +3007,8 @@ function UnifiedModelPicker({
       : ["off"];
   }, [currentModel]);
 
-  // 默认显示经常使用的 10 个模型；若有搜索词则全量搜索匹配
+  // 展示顺序完全由后端分组排序（provider 分组、组内按名称）决定；
+  // 本地仅保留搜索过滤，不做任何重排。
   const displayedModels = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q) {
@@ -3045,37 +3019,8 @@ function UnifiedModelPicker({
           m.provider.toLowerCase().includes(q),
       );
     }
-    const recentIds = getRecentModelIds();
-    const result: ChatModelItem[] = [];
-    const added = new Set<string>();
-
-    // 1. 当前选中的模型优先展示
-    if (currentModel && !added.has(currentModel.id)) {
-      result.push(currentModel);
-      added.add(currentModel.id);
-    }
-
-    // 2. 常用/近期使用过的模型
-    for (const rid of recentIds) {
-      if (result.length >= 10) break;
-      const found = models.find((m) => m.id === rid);
-      if (found && !added.has(found.id)) {
-        result.push(found);
-        added.add(found.id);
-      }
-    }
-
-    // 3. 用可用模型列表按顺序补齐至 10 个
-    for (const m of models) {
-      if (result.length >= 10) break;
-      if (!added.has(m.id)) {
-        result.push(m);
-        added.add(m.id);
-      }
-    }
-
-    return result;
-  }, [models, searchQuery, currentModel]);
+    return models;
+  }, [models, searchQuery]);
 
   return (
     // 移动端保持 static：浮层改为相对输入框整宽展开（见下方 bottom-full left-0 right-0），
@@ -3319,7 +3264,6 @@ function UnifiedModelPicker({
                         key={m.id}
                         type="button"
                         onClick={() => {
-                          recordRecentModelId(m.id);
                           onModelChange(m.id);
                           setOpen(false);
                         }}
@@ -3365,7 +3309,7 @@ function UnifiedModelPicker({
                 <span>
                   {searchQuery
                     ? `${displayedModels.length} 个结果`
-                    : `常用 ${displayedModels.length} 个模型 (共 ${models.length} 个)`}
+                    : `共 ${models.length} 个模型`}
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-0.5">
