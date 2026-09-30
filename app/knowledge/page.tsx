@@ -15,7 +15,6 @@ import {
   fetchKnowledgeBaseChildren,
   fetchKnowledgeBases,
   moveFile,
-  uploadSingleKnowledgeFile,
   uploadKnowledgeFiles,
 } from "@/lib/api/knowledge";
 import {
@@ -24,10 +23,7 @@ import {
 } from "@/components/knowledge/ConfirmModal";
 import { KnowledgeChatPanel } from "@/components/knowledge/KnowledgeChatPanel";
 import { KnowledgeTree } from "@/components/knowledge/KnowledgeTree";
-import {
-  UploadProgressCard,
-  type UploadTaskItem,
-} from "@/components/knowledge/UploadProgressCard";
+import { useUploadTasks } from "@/components/knowledge/UploadTasksProvider";
 import {
   FolderInfo,
   KnowledgeBaseInfo,
@@ -319,7 +315,9 @@ function KnowledgeWorkspace() {
    * 提交里，此时双方读到的 state 还是旧值，只有 ref 能立即生效。
    */
   const loadingKbIdsRef = useRef<Set<string>>(new Set());
-  const [uploadTasks, setUploadTasks] = useState<UploadTaskItem[]>([]);
+  // 上传任务为用户级全局状态（UploadTasksProvider）：卡片独立于对话区，
+  // 切换 session / 页面不丢失；本页面只负责把文件加入队列。
+  const { uploadTasks, addFiles, registerSettledHandler } = useUploadTasks();
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   /**
@@ -827,174 +825,13 @@ function KnowledgeWorkspace() {
     return () => window.clearInterval(timer);
   }, [filesByKb]);
 
-  const processingTaskIdsRef = useRef<Set<string>>(new Set());
-
-  // 多文件并发调度：最多允许 2 个文件同时进行数据上传传输
+  // 上传完成的回调注册到全局 Provider：文件上传 + 触发索引后刷新本页文件列表。
+  // 离开知识库页时注销（Provider 静默跳过，回来时页面自行加载）。
   useEffect(() => {
-    const MAX_CONCURRENT = 2;
-    const currentUploadingCount = uploadTasks.filter(
-      (t) => t.status === "uploading"
-    ).length;
-
-    const availableSlots = MAX_CONCURRENT - currentUploadingCount;
-    if (availableSlots <= 0) return;
-
-    const waitingTasks = uploadTasks.filter(
-      (t) => t.status === "waiting" && !processingTaskIdsRef.current.has(t.id)
-    );
-
-    const tasksToStart = waitingTasks.slice(0, availableSlots);
-    tasksToStart.forEach((task) => {
-      void runSingleUploadTask(task);
+    return registerSettledHandler((knowledgeBaseId) => {
+      void loadKnowledgeBaseWorkspace(knowledgeBaseId);
     });
-  }, [uploadTasks]);
-
-  const runSingleUploadTask = async (task: UploadTaskItem) => {
-    processingTaskIdsRef.current.add(task.id);
-    const controller = new AbortController();
-
-    // 更新任务为 uploading 状态并挂载 abortController
-    setUploadTasks((prev) =>
-      prev.map((t) =>
-        t.id === task.id
-          ? { ...t, status: "uploading", abortController: controller }
-          : t
-      )
-    );
-
-    try {
-      const uploaded = await uploadSingleKnowledgeFile({
-        file: task.file,
-        knowledge_base_id: task.knowledgeBaseId,
-        folder_id: task.folderId,
-        signal: controller.signal,
-        onUploadProgress: (progressEvent) => {
-          setUploadTasks((prev) =>
-            prev.map((t) => {
-              if (t.id !== task.id) return t;
-              return {
-                ...t,
-                progress: progressEvent.progress,
-                loaded: progressEvent.loaded,
-                speed: progressEvent.speed,
-                estimatedSeconds: progressEvent.estimatedSeconds,
-              };
-            })
-          );
-        },
-      });
-
-      // 上传成功 -> 标记为 indexing 状态
-      setUploadTasks((prev) =>
-        prev.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                status: "indexing",
-                progress: 1,
-                loaded: task.fileSize,
-                speed: 0,
-                estimatedSeconds: 0,
-                fileId: uploaded.file_id,
-              }
-            : t
-        )
-      );
-
-      // 立即触发后台索引构建
-      await buildKnowledgeIndex({
-        knowledge_base_id: task.knowledgeBaseId,
-        file_ids: [uploaded.file_id],
-      });
-
-      // 刷新工作台文件列表，让左侧列表立刻看到新文件
-      await loadKnowledgeBaseWorkspace(task.knowledgeBaseId);
-    } catch (error) {
-      if (
-        controller.signal.aborted ||
-        (error instanceof Error && error.name === "AbortError")
-      ) {
-        // 用户主动取消 -> 移除该任务
-        setUploadTasks((prev) => prev.filter((t) => t.id !== task.id));
-      } else {
-        setUploadTasks((prev) =>
-          prev.map((t) => {
-            if (t.id !== task.id) return t;
-            return {
-              ...t,
-              status: "error",
-              speed: 0,
-              estimatedSeconds: 0,
-              errorMessage:
-                error instanceof Error ? error.message : "上传失败",
-            };
-          })
-        );
-      }
-    } finally {
-      processingTaskIdsRef.current.delete(task.id);
-    }
-  };
-
-  // 同步左侧轮询到的解析完成状态到悬浮上传卡片中。
-  // 跨所有已加载的库查找：上传过程中用户可能已经切到别的库浏览了。
-  const fileById = useMemo(() => {
-    const next = new Map<string, KnowledgeFile>();
-    for (const list of Object.values(filesByKb)) {
-      for (const file of list) next.set(file.file_id, file);
-    }
-    return next;
-  }, [filesByKb]);
-
-  useEffect(() => {
-    if (fileById.size === 0 || uploadTasks.length === 0) return;
-
-    setUploadTasks((prev) => {
-      let changed = false;
-      const next = prev.map((task) => {
-        if (task.status !== "indexing" || !task.fileId) return task;
-        const matchedFile = fileById.get(task.fileId);
-        if (!matchedFile) return task;
-
-        if (matchedFile.index_status === "success") {
-          changed = true;
-          return { ...task, status: "completed" as const, progress: 1 };
-        } else if (matchedFile.index_status === "failed") {
-          changed = true;
-          return {
-            ...task,
-            status: "error" as const,
-            errorMessage: "文件解析或索引构建失败",
-          };
-        }
-        return task;
-      });
-      return changed ? next : prev;
-    });
-  }, [fileById, uploadTasks.length]);
-
-  // 防误触刷新拦截：只要有处于上传、排队或索引中的任务，就弹窗保护
-  useEffect(() => {
-    const hasActiveTask = uploadTasks.some(
-      (t) =>
-        t.status === "uploading" ||
-        t.status === "waiting" ||
-        t.status === "indexing"
-    );
-    if (!hasActiveTask) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue =
-        "文件正在上传或构建中，离开页面将导致传输中断。确认离开吗？";
-      return event.returnValue;
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [uploadTasks]);
+  }, [registerSettledHandler, loadKnowledgeBaseWorkspace]);
 
   const handleUploadClick = (targetFolderId: string | null = null) => {
     if (!selectedKbId) return;
@@ -1011,70 +848,9 @@ function KnowledgeWorkspace() {
     const targetFolderId = uploadTargetFolderRef.current;
     uploadTargetFolderRef.current = null;
 
-    const newTasks: UploadTaskItem[] = fileList.map((file, idx) => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-      file,
-      fileName: file.name,
-      fileSize: file.size,
-      knowledgeBaseId: selectedKbId,
-      folderId: targetFolderId,
-      status: "waiting",
-      progress: 0,
-      loaded: 0,
-      speed: 0,
-      estimatedSeconds: 0,
-    }));
-
-    setUploadTasks((prev) => [...prev, ...newTasks]);
+    addFiles(fileList, selectedKbId, targetFolderId);
     setNotice(`已添加 ${fileList.length} 个文件到上传队列。`);
     event.target.value = "";
-  };
-
-  const handleCancelTask = (taskId: string) => {
-    const target = uploadTasks.find((t) => t.id === taskId);
-    if (target?.abortController) {
-      target.abortController.abort();
-    } else {
-      setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
-    }
-  };
-
-  const handleRetryTask = (taskId: string) => {
-    setUploadTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              status: "waiting",
-              progress: 0,
-              loaded: 0,
-              speed: 0,
-              estimatedSeconds: 0,
-              errorMessage: undefined,
-            }
-          : t
-      )
-    );
-  };
-
-  const handleRemoveTask = (taskId: string) => {
-    setUploadTasks((prev) => prev.filter((t) => t.id !== taskId));
-  };
-
-  const handleClearCompletedTasks = () => {
-    setUploadTasks((prev) => prev.filter((t) => t.status !== "completed"));
-  };
-
-  const handleCloseAllTasks = () => {
-    const isRunning = uploadTasks.some(
-      (t) =>
-        t.status === "uploading" ||
-        t.status === "indexing" ||
-        t.status === "waiting"
-    );
-    if (!isRunning) {
-      setUploadTasks([]);
-    }
   };
 
   /** 只创建顶层知识库：子知识库入口已下线，层级改由文件夹表达 */
@@ -1623,14 +1399,6 @@ function KnowledgeWorkspace() {
         </div>
       ) : null}
 
-      <UploadProgressCard
-        tasks={uploadTasks}
-        onCancelTask={handleCancelTask}
-        onRetryTask={handleRetryTask}
-        onRemoveTask={handleRemoveTask}
-        onClearCompleted={handleClearCompletedTasks}
-        onCloseAll={handleCloseAllTasks}
-      />
     </>
   );
 }

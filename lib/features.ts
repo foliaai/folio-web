@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import { Home, Bot, Library, Sparkle } from "lucide-react";
+import { Bot, Library, Sparkle } from "lucide-react";
+import { FoliaLeafIcon } from "@/lib/icons";
 
 export type FeatureKey = "home" | "agents" | "knowledge" | "skills";
 
@@ -30,7 +31,7 @@ export interface FeatureConfig {
  * 顺序与移动端底栏一致（首页/知识库/技能/智能体）；label 两端部署统一，不随品牌变化。
  */
 export const FEATURES: FeatureConfig[] = [
-  { key: "home", label: "首页", href: "/", icon: Home, locked: true },
+  { key: "home", label: "首页", href: "/", icon: FoliaLeafIcon, locked: true },
   { key: "knowledge", label: "知识库", href: "/knowledge", icon: Library, requiresAuth: true },
   { key: "skills", label: "技能", href: "/skills", icon: Sparkle, requiresAuth: true },
   { key: "agents", label: "智能体", href: "/agents", icon: Bot, locked: true },
