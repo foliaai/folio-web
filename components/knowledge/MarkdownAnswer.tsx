@@ -8,20 +8,17 @@
  *      （equation 类型的 chunk 在后端被切成 text + LaTeX 语法，这里就能渲染）。
  *   2. 内联引用：扫描所有文本节点中的引用占位符，替换为 `<CitationChip />`。
  *
- * 引用占位符支持两种格式（同时识别，方便从 Phase A 过渡到 Phase B）：
- *   - Phase B（首选）：`[cN]` 短 alias，例如 `[c1]` `[c12]`。后端 prompt 强制
- *     LLM 用这种形式；token 省、不容易被截断。alias 在每条 message.citations
- *     里通过 `citation.alias` 字段携带。
- *   - Phase A（兼容）：`[chunk-<uuid>]` 完整 chunk_id。老会话回放或新模型偶发
- *     时仍能识别；按 citation.chunk_id 直接匹配。
+ * 引用占位符单一格式：`[cN]` 短 alias（如 `[c1]` `[c12]`）。后端 prompt 强制
+ * LLM 用这种形式；alias 在每条 message.citations 里通过 `citation.alias` 字段
+ * 携带。alias 是模型/落库/回放的统一口径——不再识别 `[chunk-<uuid>]` 完整 id
+ * 形式（历史 Phase A 兼容路径已删除，口径见 folio-aks 单口径决策）。
  *
  * 设计要点：
- * - 渲染期间用 useMemo 预建两个查表：alias→citation 和 chunkId→citation。
+ * - 渲染期间用 useMemo 预建查表：alias→citation。
  * - 不在 markdown AST 上做 plugin，而是在 react-markdown 的 components 钩子
  *   里拦截子节点字符串（更直接、对常见 markdown 结构都生效：段落、列表、
  *   表格单元格、强调等）。
- * - 老会话没有 alias 字段时自动回退到 chunk_id 路径；都查不到则 chip 显示
- *   降级灰色"?"占位 + console.warn。
+ * - 查不到的引用号 chip 显示降级灰色"?"占位 + console.warn。
  */
 
 import { Children, useMemo } from "react";
@@ -34,11 +31,8 @@ import rehypeKatex from "rehype-katex";
 import { CitationChip } from "@/components/knowledge/CitationChip";
 import type { Citation } from "@/lib/chat-types";
 
-// 同时匹配 `[cN]` 与 `[chunk-<uuid 等价 hex 段>]`。
-// - alias：`[c<纯数字>]`
-// - 完整 chunk_id：`[chunk-` + 至少 8 位 hex/连字符 + `]`
-const CHUNK_REF_RE = /\[(?:c\d{1,6}|chunk-[0-9a-f-]{8,})\]/gi;
-const ALIAS_RE = /^c\d+$/;
+// 匹配 `[cN]`（c + 1-6 位纯数字）
+const CHUNK_REF_RE = /\[c\d{1,6}\]/gi;
 
 interface MarkdownAnswerProps {
   content: string;
@@ -48,16 +42,10 @@ interface MarkdownAnswerProps {
 
 interface CitationLookup {
   byAlias: Map<string, { index: number; citation: Citation }>;
-  byChunkId: Map<string, { index: number; citation: Citation }>;
-}
-
-/** 大小写不敏感地匹配 chunk_id（防御 LLM 输出 chunk-1AD9521D 这种大写格式） */
-function normalizeChunkId(s: string): string {
-  return s.toLowerCase();
 }
 
 /**
- * 字符串切片：把 `[cN]` / `[chunk-xxx]` 替换为 CitationChip。
+ * 字符串切片：把 `[cN]` 替换为 CitationChip。
  * 同时把"陌生引用号"（在 citations 列表里查不到）也尝试渲染为降级 chip，
  * 这样 LLM 引用了一个 message.citations 里没有的引用号也不会显示原始裸文本。
  */
@@ -78,13 +66,9 @@ function splitTextToChips(
       parts.push(text.slice(lastIndex, match.index));
     }
     const raw = match[0].slice(1, -1); // 去掉 [ ]
-    const key = normalizeChunkId(raw);
+    const key = raw.toLowerCase();
 
-    // 路径 1：alias 形式（首选）
-    // 路径 2：完整 chunk_id 形式（兼容老消息 / 模型偶发回退）
-    const known = ALIAS_RE.test(key)
-      ? lookup.byAlias.get(key)
-      : lookup.byChunkId.get(key);
+    const known = lookup.byAlias.get(key);
 
     let index: number | "?";
     let citation: Citation | undefined;
@@ -101,7 +85,7 @@ function splitTextToChips(
           console.warn(
             "[citation] LLM 引用了 message.citations 里没有的引用号:",
             raw,
-            `（citations 已有 ${lookup.byAlias.size || lookup.byChunkId.size} 条）`
+            `（citations 已有 ${lookup.byAlias.size} 条）`
           );
         }
       }
@@ -146,7 +130,6 @@ export function MarkdownAnswer({
 }: MarkdownAnswerProps) {
   const lookup = useMemo<CitationLookup>(() => {
     const byAlias = new Map<string, { index: number; citation: Citation }>();
-    const byChunkId = new Map<string, { index: number; citation: Citation }>();
     (citations ?? []).forEach((c, i) => {
       // 优先使用 alias 编号（如 "c7" → 7），与 ReferencesSidePanel 保持一致
       let idx = i + 1;
@@ -154,11 +137,9 @@ export function MarkdownAnswer({
         const m = /^c(\d+)$/i.exec(c.alias);
         if (m) idx = Number(m[1]);
       }
-      const entry = { index: idx, citation: c };
-      if (c?.alias) byAlias.set(c.alias.toLowerCase(), entry);
-      if (c?.chunk_id) byChunkId.set(normalizeChunkId(c.chunk_id), entry);
+      if (c?.alias) byAlias.set(c.alias.toLowerCase(), { index: idx, citation: c });
     });
-    return { byAlias, byChunkId };
+    return { byAlias };
   }, [citations]);
 
   // 仅用于去重 console.warn；不参与渲染序号
@@ -179,7 +160,7 @@ export function MarkdownAnswer({
   );
 
   // react-markdown 的 components 钩子；这里覆盖所有可能携带文本的容器。
-  // 注意 `code` / `pre` 不拦截（代码里出现的 [chunk-xxx] / [cN] 不应被替换）。
+  // 注意 `code` / `pre` 不拦截（代码里出现的 [cN] 不应被替换）。
   const components = useMemo(() => {
     const makeTransform = (Tag: React.ElementType) => {
       const Component = (props: Record<string, unknown>) => {
