@@ -10,6 +10,19 @@ export interface KnowledgeBaseInfo {
   parent_knowledge_base_id?: string | null;
   knowledge_type?: string;
   description?: string | null;
+  /** 可见性：private=个人（默认）/ team=团队 / public=公共 */
+  visibility?: string;
+  /** visibility=team 时绑定的团队ID */
+  team_id?: string | null;
+  /** 团队名称（visibility=team 时后端返回） */
+  team_name?: string | null;
+  /** 归属用户ID（private 的 owner / 共享库的创建者） */
+  owner_user_id?: string;
+}
+
+/** 知识库列表附带的能力位（前端据此显隐公共库创建入口） */
+export interface KnowledgeBaseListPermissions {
+  can_create_public: boolean;
 }
 
 export interface FolderInfo {

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildKnowledgeIndex,
   createFolder,
-  createKnowledgeBase,
   deleteFile,
   deleteFolder,
   deleteKnowledgeBase,
@@ -17,12 +16,15 @@ import {
   moveFile,
   uploadKnowledgeFiles,
 } from "@/lib/api/knowledge";
+import { CreateKbDialog } from "@/components/knowledge/CreateKbDialog";
+import { TeamMembersDialog } from "@/components/knowledge/TeamMembersDialog";
 import {
   ConfirmModal,
   type ConfirmAction,
 } from "@/components/knowledge/ConfirmModal";
 import { KnowledgeChatPanel } from "@/components/knowledge/KnowledgeChatPanel";
 import { KnowledgeTree } from "@/components/knowledge/KnowledgeTree";
+import { KbFilePanel } from "@/components/knowledge/KbFilePanel";
 import { useUploadTasks } from "@/components/knowledge/UploadTasksProvider";
 import {
   FolderInfo,
@@ -33,8 +35,9 @@ import { cacheKnowledgeFileView } from "@/lib/knowledge-viewer";
 import {
   AlertTriangle,
   CheckCircle2,
+  Database,
+  FolderOpen,
   Loader2,
-  PanelLeftOpen,
   X,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
@@ -125,8 +128,11 @@ function getAverageProgress(files: KnowledgeFile[]): number {
   return files.reduce((sum, file) => sum + Math.max(0, Math.min(1, file.progress ?? 0)), 0) / files.length;
 }
 
-async function fetchKnowledgeBaseTree(): Promise<KnowledgeBaseInfo[]> {
-  const roots = await fetchKnowledgeBases();
+async function fetchKnowledgeBaseTree(): Promise<{
+  kbs: KnowledgeBaseInfo[];
+  canCreatePublic: boolean;
+}> {
+  const { knowledgeBases: roots, permissions } = await fetchKnowledgeBases();
   const visited = new Set<string>();
   const queue = [...roots];
   const all = [...roots];
@@ -149,7 +155,7 @@ async function fetchKnowledgeBaseTree(): Promise<KnowledgeBaseInfo[]> {
     });
   }
 
-  return all;
+  return { kbs: all, canCreatePublic: permissions.can_create_public };
 }
 
 interface InputPromptAction {
@@ -245,29 +251,28 @@ function KnowledgeGuestView() {
   );
 }
 
-// ---- 左侧栏可拖拽分割条 ----
+// ---- 左侧管理区可拖拽分割条 ----
 // 宽度按视口比例存储：固定像素在 1280 与 2560 上的占屏差一倍，比例才稳定。
 // 未自定义时走 DEFAULT_RATIO 并封顶 DEFAULT_MAX；拖过一次后放开到 SPLIT_MAX。
 // 双击分割条清除自定义值，回到默认比例。
 const SPLIT_RATIO_STORAGE_KEY = "knowledge-workspace-left-ratio";
-/** 默认占屏 1/4 */
-const SPLIT_RATIO_DEFAULT = 0.25;
-const SPLIT_MIN = 240;
-const SPLIT_MAX = 560;
-/** 默认宽度封顶：25vw 在大屏上过宽，超过即压住，多出的宽度留给对话区 */
-const SPLIT_DEFAULT_MAX = 420;
+/**
+ * 管理区现在是两栏（知识库列表 + 文件管理），默认占屏约 2/5，
+ * 保证文件栏在常见 1440/1920 屏上有 320~480px 的可用宽度。
+ */
+const SPLIT_RATIO_DEFAULT = 0.38;
+const SPLIT_MIN = 520;
+const SPLIT_MAX = 900;
+/** 默认宽度封顶：比例在大屏上过宽，超过即压住，多出的宽度留给对话区 */
+const SPLIT_DEFAULT_MAX = 700;
 /** SSR / 首帧拿不到 window.innerWidth 时的兜底宽度 */
-const SPLIT_FALLBACK_WIDTH = 360;
+const SPLIT_FALLBACK_WIDTH = 640;
+/** 库列表列宽（w-56）；折叠时管理块总宽减去其一半（右线左移 112px） */
+const LIST_COLUMN_WIDTH = 224;
 /** 当前选中的知识库 ID 持久化 key（刷新后保持在原知识库，而非跳回第一个） */
 const SELECTED_KB_STORAGE_KEY = "knowledge-workspace-selected-kb";
-/** 左栏收/展状态持久化 key */
+/** 库列表收/展状态持久化 key（只收列表列，文件管理区常驻） */
 const LEFT_COLLAPSED_STORAGE_KEY = "knowledge-workspace-left-collapsed";
-/**
- * 收起后保留的导轨宽度。
- * 不收到 0：那样展开按钮只能浮在对话区上方，既要避让对话区自己的顶栏，
- * 也让人以为面板被删掉了。留一条 44px 的轨道，收起是可逆的、位置是固定的。
- */
-const SPLIT_RAIL_WIDTH = 44;
 
 function KnowledgeWorkspace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +281,8 @@ function KnowledgeWorkspace() {
   const [leftRatio, setLeftRatio] = useState<number | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  /** 移动端抽屉当前页签：知识库列表 / 当前库的文件管理 */
+  const [drawerTab, setDrawerTab] = useState<"kbs" | "files">("kbs");
   const [viewportWidth, setViewportWidth] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -283,6 +290,12 @@ function KnowledgeWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [inputPrompt, setInputPrompt] = useState<InputPromptAction | null>(null);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseInfo[]>([]);
+  /** 公共库创建权（后端 permissions.can_create_public；prd 公网仅管理员） */
+  const [canCreatePublic, setCanCreatePublic] = useState(false);
+  /** 新建知识库对话框（可见性 + 团队选择） */
+  const [createKbOpen, setCreateKbOpen] = useState(false);
+  /** 正在管理成员的团队知识库（成员面板挂团队库行上） */
+  const [manageTeamKb, setManageTeamKb] = useState<KnowledgeBaseInfo | null>(null);
   const [knowledgeMetrics, setKnowledgeMetrics] = useState<Record<string, KnowledgeMetric>>({});
   const [selectedKbId, setSelectedKbId] = useState("");
   /**
@@ -344,15 +357,28 @@ function KnowledgeWorkspace() {
   const selectedFolder = folders.find((folder) => folder.folder_id === selectedFolderId);
   const canMoveFiles = true;
 
-  /** 把问答锁定到某个知识库（由知识库行的「对话」按钮触发） */
-  const startKbChat = useCallback((kb: KnowledgeBaseInfo) => {
-    setChatScope({
-      kbId: kb.knowledge_base_id,
-      kbName: kb.knowledge_base_name,
-      folderId: null,
-      folderName: null,
-    });
-  }, []);
+  /**
+   * 选中知识库 = 浏览与问答同步切换：文件面板切到该库，对话区也切到
+   * 该库的会话（旧知识库行「对话」按钮的职责并入选中行为）。
+   * 重复点击当前库不动会话——避免把文件夹级问答意外顶回整库。
+   */
+  const selectKnowledgeBase = useCallback(
+    (id: string) => {
+      setSelectedKbId(id);
+      setChatScope((current) => {
+        if (current?.kbId === id) return current;
+        const kb = knowledgeBases.find((item) => item.knowledge_base_id === id);
+        if (!kb) return current;
+        return {
+          kbId: kb.knowledge_base_id,
+          kbName: kb.knowledge_base_name,
+          folderId: null,
+          folderName: null,
+        };
+      });
+    },
+    [knowledgeBases]
+  );
 
   /** folder_id → 所属知识库；树里可以同时展开多个库，操作必须落到文件夹自己的库上 */
   const kbIdByFolderId = useMemo(() => {
@@ -513,10 +539,20 @@ function KnowledgeWorkspace() {
     }));
   }, [knowledgeBases, knowledgeMetrics]);
 
+  /** 右侧文件面板展示的知识库（带统计的视图版本） */
+  const selectedKbView = useMemo(
+    () =>
+      knowledgeBasesView.find(
+        (kb) => kb.knowledge_base_id === selectedKbId
+      ) ?? null,
+    [knowledgeBasesView, selectedKbId]
+  );
+
   const loadKnowledgeBasesData = async () => {
     try {
-      const list = await fetchKnowledgeBaseTree();
+      const { kbs: list, canCreatePublic } = await fetchKnowledgeBaseTree();
       setKnowledgeBases(list);
+      setCanCreatePublic(canCreatePublic);
       setSelectedKbId((current) => {
         if (current && list.some((kb) => kb.knowledge_base_id === current)) {
           return current;
@@ -613,18 +649,6 @@ function KnowledgeWorkspace() {
       });
     }
   };
-
-  /** 展开某个库时按需加载它的目录；已有缓存或正在加载则跳过 */
-  const ensureKbContents = useCallback(
-    (knowledgeBaseId: string) => {
-      if (!knowledgeBaseId) return;
-      if (foldersByKb[knowledgeBaseId] || loadingKbIds[knowledgeBaseId]) return;
-      void loadKnowledgeBaseWorkspace(knowledgeBaseId);
-    },
-    // loadKnowledgeBaseWorkspace 是每次渲染重建的普通函数，这里只依赖判定条件
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [foldersByKb, loadingKbIds],
-  );
 
   useEffect(() => {
     void loadKnowledgeBasesData();
@@ -855,30 +879,7 @@ function KnowledgeWorkspace() {
 
   /** 只创建顶层知识库：子知识库入口已下线，层级改由文件夹表达 */
   const handleCreateKnowledgeBase = () => {
-    setInputPrompt({
-      title: "新建知识库",
-      placeholder: "请输入知识库名称",
-      confirmLabel: "创建",
-      onConfirm: async (name) => {
-        try {
-          setIsBusy("kb");
-          const item = await createKnowledgeBase({
-            knowledge_base_name: name,
-            parent_knowledge_base_id: null,
-          });
-          await loadKnowledgeBasesData();
-          setSelectedKbId(item.knowledge_base_id);
-          setNotice("知识库已创建。");
-        } catch (error) {
-          setNotice(
-            error instanceof Error ? `创建知识库失败：${error.message}` : "创建知识库失败"
-          );
-        } finally {
-          setIsBusy(null);
-          setInputPrompt(null);
-        }
-      },
-    });
+    setCreateKbOpen(true);
   };
 
   const handleCreateFolder = (parentFolderId: string | null = null) => {
@@ -1115,60 +1116,57 @@ function KnowledgeWorkspace() {
         className="flex h-[calc(100dvh-3.5rem)] md:h-screen w-full bg-white xl:grid xl:grid-cols-[var(--knowledge-left-width)_6px_minmax(0,1fr)]"
         style={
           {
+            // 折叠后列表列整体让位、不留导轨：右缘分割线左移列表列宽的一半
+            // （112px），另一半空间留给文件区加宽，剩余给对话区
             "--knowledge-left-width": `${
-              leftCollapsed ? SPLIT_RAIL_WIDTH : effectiveLeftWidth
+              leftCollapsed
+                ? effectiveLeftWidth - LIST_COLUMN_WIDTH / 2
+                : effectiveLeftWidth
             }px`,
           } as React.CSSProperties
         }
       >
-        {/* 桌面端左侧树面板 (xl 及以上显示) */}
+        {/* 桌面端管理区（xl 及以上显示）：库列表 + 文件管理。
+            折叠时列表列整体隐藏（保留挂载以维持内部状态），文件区顶到最左，
+            展开按钮移入文件区头部最左——与展开态列表头部的收起按钮同位。 */}
         <div className="hidden min-w-0 overflow-hidden xl:flex">
-          {leftCollapsed ? (
-            <div className="flex h-full w-full items-start justify-center border-r border-gray-200 py-2.5">
-              <button
-                type="button"
-                onClick={toggleLeftCollapsed}
-                aria-expanded={false}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground cursor-pointer"
-                title="展开知识库管理"
-                aria-label="展开知识库管理"
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </button>
-            </div>
-          ) : null}
-
-          {/* 收起时用 hidden 隐藏而非卸载：树的滚动位置与搜索框开合是组件内部
-              状态，卸载会让每次收/展都把它们重置掉。display:none 同时把子树移出
-              可访问性树与 tab 顺序，不会留下隐形焦点。 */}
           <div
             className={cn(
-              "min-w-0 flex-1 overflow-hidden",
-              leftCollapsed && "hidden",
+              "h-full w-56 shrink-0 border-r border-gray-200",
+              leftCollapsed && "hidden"
             )}
           >
-            <KnowledgeTree
-              knowledgeBases={knowledgeBasesView}
-              selectedKbId={selectedKbId}
-              foldersByKb={foldersByKb}
-              filesByKb={filesByKb}
-              loadingKbIds={loadingKbIds}
-              onRequestKbContents={ensureKbContents}
+            {/* 收起时用 hidden 隐藏而非卸载：列表的滚动位置与搜索框开合是组件
+                内部状态，卸载会让每次收/展都把它们重置掉。display:none 同时把
+                子树移出可访问性树与 tab 顺序，不会留下隐形焦点。
+                注意用 w-full 而不是 w-56：外层列宽含 1px border（border-box），
+                子级再撑满 224px 会把这 1px 竖线盖掉。 */}
+            <div className="h-full w-full overflow-hidden">
+              <KnowledgeTree
+                knowledgeBases={knowledgeBasesView}
+                selectedKbId={selectedKbId}
+                chatKbId={chatScope?.kbId ?? null}
+                chatFolderId={selectedFolderId}
+                searchTerm={searchTerm}
+                onSelectKb={selectKnowledgeBase}
+                onManageTeamMembers={(kb) => setManageTeamKb(kb)}
+                onCreateKb={handleCreateKnowledgeBase}
+                onDeleteKb={(kb) => handleDeleteKnowledgeBase(kb)}
+                onSearchChange={setSearchTerm}
+                onCollapse={toggleLeftCollapsed}
+              />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <KbFilePanel
+              kb={selectedKbView}
+              folders={folders}
+              files={files}
+              loading={Boolean(selectedKbId && loadingKbIds[selectedKbId])}
               uploadTasks={uploadTasks}
-              selectedFolderId={selectedFolderId}
-              searchTerm={searchTerm}
               canMoveFiles={canMoveFiles}
-              onSelectKb={(id) => {
-                // 只切换浏览目标，问答会话保持不变
-                setSelectedKbId(id);
-              }}
-              chatKbId={chatScope?.kbId ?? null}
-              onChatWithKb={(kb) => {
-                setSelectedKbId(kb.knowledge_base_id);
-                startKbChat(kb);
-              }}
-              onCreateKb={handleCreateKnowledgeBase}
-              onDeleteKb={(kb) => handleDeleteKnowledgeBase(kb)}
+              selectedFolderId={selectedFolderId}
+              onExpandList={leftCollapsed ? toggleLeftCollapsed : undefined}
               onSelectFolder={(id) => {
                 // 仅由文件夹行上的「对话」按钮触发，展开/折叠不会切会话
                 startFolderChat(id);
@@ -1179,14 +1177,11 @@ function KnowledgeWorkspace() {
               onDeleteFolder={handleDeleteFolder}
               onDeleteFile={handleDeleteFile}
               onRetryFile={handleRetryFile}
-              onCollapse={toggleLeftCollapsed}
-              onSearchChange={setSearchTerm}
               onMoveFileToFolder={async (file, targetFolderId) => {
                 try {
                   setIsBusy("move");
                   await moveFile(file.file_id, targetFolderId);
-                  // 刷新文件自己所属的库：树里可以同时展开多个库，被拖动的文件
-                  // 不一定来自当前浏览的那个
+                  // 文件一定属于当前浏览的库（面板只展示它），按归属刷新
                   await loadKnowledgeBaseWorkspace(
                     file.knowledge_base_id || selectedKbId
                   );
@@ -1203,38 +1198,34 @@ function KnowledgeWorkspace() {
           </div>
         </div>
 
-        {/* 可拖拽分割条：仅在 xl 及以上可用。
-            左栏收起时整条让位——拖动一个已收起的面板没有可预期的结果，
-            边线此时由导轨自己的 border-r 提供，不会缺一道线。 */}
+        {/* 可拖拽分割条：管理块与对话区之间，折叠态下文件区仍占位，拖拽照常可用。 */}
         <div
           className={cn(
             "group relative hidden h-full w-full xl:flex xl:items-center xl:justify-center",
             dragging && "bg-primary/10"
           )}
         >
-          {leftCollapsed ? null : (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="拖动调整管理区宽度"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDoubleClick={() => setLeftRatio(null)}
+            className="h-full w-full cursor-col-resize"
+            title="拖动调整宽度（双击恢复默认）"
+          >
             <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="拖动调整左侧宽度"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDoubleClick={() => setLeftRatio(null)}
-              className="h-full w-full cursor-col-resize"
-              title="拖动调整宽度（双击恢复默认 1/4 屏宽）"
-            >
-              <div
-                className={cn(
-                  "h-full w-px transition-colors",
-                  dragging
-                    ? "bg-primary/60"
-                    : "bg-gray-200 group-hover:bg-primary/40"
-                )}
-              />
-            </div>
-          )}
+              className={cn(
+                "h-full w-px transition-colors",
+                dragging
+                  ? "bg-primary/60"
+                  : "bg-gray-200 group-hover:bg-primary/40"
+              )}
+            />
+          </div>
         </div>
 
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -1262,7 +1253,8 @@ function KnowledgeWorkspace() {
         />
       </div>
 
-      {/* 移动端知识库/文件管理抽屉 (xl 以下) */}
+      {/* 移动端知识库/文件管理抽屉 (xl 以下)：库列表与文件管理两个页签，
+          选中库后自动切到「文件」页签继续操作 */}
       <div
         className={cn(
           "fixed inset-0 z-[1100] bg-black/40 backdrop-blur-xs transition-opacity duration-300 xl:hidden",
@@ -1272,72 +1264,111 @@ function KnowledgeWorkspace() {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-[1101] flex h-full w-[min(380px,88vw)] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out xl:hidden",
+          "fixed inset-y-0 left-0 z-[1101] flex h-full w-[min(420px,92vw)] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out xl:hidden",
           mobileDrawerOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-3">
-          <span className="text-sm font-semibold text-foreground">知识库与文件管理</span>
+        <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/80 px-4 py-2.5">
+          <div
+            role="tablist"
+            aria-label="知识库管理"
+            className="flex items-center gap-0.5 rounded-full bg-gray-100 p-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={drawerTab === "kbs"}
+              onClick={() => setDrawerTab("kbs")}
+              className={cn(
+                "flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+                drawerTab === "kbs"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted hover:text-foreground"
+              )}
+            >
+              <Database className="h-3.5 w-3.5" />
+              知识库
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={drawerTab === "files"}
+              onClick={() => setDrawerTab("files")}
+              className={cn(
+                "flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+                drawerTab === "files"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted hover:text-foreground"
+              )}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              文件
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setMobileDrawerOpen(false)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-gray-200/70 hover:text-foreground cursor-pointer"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-gray-200/70 hover:text-foreground cursor-pointer"
             aria-label="关闭"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden">
-          <KnowledgeTree
-            knowledgeBases={knowledgeBasesView}
-            selectedKbId={selectedKbId}
-            foldersByKb={foldersByKb}
-            filesByKb={filesByKb}
-            loadingKbIds={loadingKbIds}
-            onRequestKbContents={ensureKbContents}
-            uploadTasks={uploadTasks}
-            selectedFolderId={selectedFolderId}
-            searchTerm={searchTerm}
-            canMoveFiles={canMoveFiles}
-            onSelectKb={(id) => {
-              setSelectedKbId(id);
-            }}
-            chatKbId={chatScope?.kbId ?? null}
-            onChatWithKb={(kb) => {
-              setSelectedKbId(kb.knowledge_base_id);
-              startKbChat(kb);
-              setMobileDrawerOpen(false);
-            }}
-            onCreateKb={handleCreateKnowledgeBase}
-            onDeleteKb={(kb) => handleDeleteKnowledgeBase(kb)}
-            onSelectFolder={(id) => {
-              startFolderChat(id);
-              setMobileDrawerOpen(false);
-            }}
-            onOpenFile={handleOpenFile}
-            onCreateFolder={handleCreateFolder}
-            onUploadFile={handleUploadClick}
-            onDeleteFolder={handleDeleteFolder}
-            onDeleteFile={handleDeleteFile}
-            onRetryFile={handleRetryFile}
-            onSearchChange={setSearchTerm}
-            onMoveFileToFolder={async (file, targetFolderId) => {
-              try {
-                setIsBusy("move");
-                await moveFile(file.file_id, targetFolderId);
-                await loadKnowledgeBaseWorkspace(
-                  file.knowledge_base_id || selectedKbId
-                );
-                setNotice(`文件「${file.file_name}」已移动。`);
-              } catch (error) {
-                setNotice(
-                  error instanceof Error ? `移动失败：${error.message}` : "移动失败"
-                );
-              } finally {
-                setIsBusy(null);
-              }
-            }}
-          />
+          {drawerTab === "kbs" ? (
+            <KnowledgeTree
+              knowledgeBases={knowledgeBasesView}
+              selectedKbId={selectedKbId}
+              chatKbId={chatScope?.kbId ?? null}
+              chatFolderId={selectedFolderId}
+              searchTerm={searchTerm}
+              onSelectKb={(id) => {
+                // 选中后切到「文件」页签继续管理，抽屉保持打开；问答同步切库
+                selectKnowledgeBase(id);
+                setDrawerTab("files");
+              }}
+              onManageTeamMembers={(kb) => setManageTeamKb(kb)}
+              onCreateKb={handleCreateKnowledgeBase}
+              onDeleteKb={(kb) => handleDeleteKnowledgeBase(kb)}
+              onSearchChange={setSearchTerm}
+            />
+          ) : (
+            <KbFilePanel
+              kb={selectedKbView}
+              folders={folders}
+              files={files}
+              loading={Boolean(selectedKbId && loadingKbIds[selectedKbId])}
+              uploadTasks={uploadTasks}
+              canMoveFiles={canMoveFiles}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={(id) => {
+                startFolderChat(id);
+                setMobileDrawerOpen(false);
+              }}
+              onOpenFile={handleOpenFile}
+              onCreateFolder={handleCreateFolder}
+              onUploadFile={handleUploadClick}
+              onDeleteFolder={handleDeleteFolder}
+              onDeleteFile={handleDeleteFile}
+              onRetryFile={handleRetryFile}
+              onMoveFileToFolder={async (file, targetFolderId) => {
+                try {
+                  setIsBusy("move");
+                  await moveFile(file.file_id, targetFolderId);
+                  await loadKnowledgeBaseWorkspace(
+                    file.knowledge_base_id || selectedKbId
+                  );
+                  setNotice(`文件「${file.file_name}」已移动。`);
+                } catch (error) {
+                  setNotice(
+                    error instanceof Error ? `移动失败：${error.message}` : "移动失败"
+                  );
+                } finally {
+                  setIsBusy(null);
+                }
+              }}
+            />
+          )}
         </div>
       </aside>
 
@@ -1357,6 +1388,32 @@ function KnowledgeWorkspace() {
           setInputPrompt(null);
         }}
       />
+      {createKbOpen ? (
+        <CreateKbDialog
+          canCreatePublic={canCreatePublic}
+          onClose={() => setCreateKbOpen(false)}
+          onCreated={async (kb) => {
+            setCreateKbOpen(false);
+            await loadKnowledgeBasesData();
+            setSelectedKbId(kb.knowledge_base_id);
+            setNotice(
+              kb.visibility === "team"
+                  ? `共享知识库「${kb.knowledge_base_name}」已创建，可通过行内「成员管理」邀请同事。`
+                  : kb.visibility === "public"
+                    ? `订阅知识库「${kb.knowledge_base_name}」已创建，所有登录用户可读。`
+                  : "知识库已创建。"
+            );
+          }}
+        />
+      ) : null}
+      {manageTeamKb?.team_id ? (
+        <TeamMembersDialog
+          teamId={manageTeamKb.team_id}
+          kbName={manageTeamKb.knowledge_base_name}
+          onClose={() => setManageTeamKb(null)}
+          onChanged={(message) => setNotice(message)}
+        />
+      ) : null}
 
       {isBusy ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/10 backdrop-blur-[2px]">

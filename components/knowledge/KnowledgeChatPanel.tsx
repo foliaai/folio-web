@@ -57,6 +57,12 @@ import {
   type ConfirmAction,
 } from "@/components/knowledge/ConfirmModal";
 import { MarkdownAnswer } from "@/components/knowledge/MarkdownAnswer";
+import {
+  getLastModelLevel,
+  ModelCapabilityIcons,
+  ThinkingBulbIcon,
+  UnifiedModelPicker,
+} from "@/components/chat/UnifiedModelPicker";
 import { ContextIndicator } from "@/components/knowledge/ContextIndicator";
 import { ReportViewer } from "@/components/knowledge/ReportViewer";
 import { RecallPathSection } from "@/components/knowledge/RecallFlowChart";
@@ -77,6 +83,7 @@ import type {
   ToolCallRecord,
   UiChatMessage,
 } from "@/lib/chat-types";
+import { BrandAvatar } from "@/components/ui/BrandAvatar";
 import { cn, formatDate } from "@/lib/utils";
 import { fetchSkills, type SkillDescriptor } from "@/lib/api/skills";
 import { SlashSkillMenu } from "@/components/skills/SlashSkillMenu";
@@ -129,8 +136,8 @@ interface KnowledgeChatPanelProps {
   /** 用户登录态（未登录时不发任何后端请求） */
   enabled?: boolean;
   /**
-   * 紧凑模式：用于父容器宽度受限的场景（如文件详情侧栏）。
-   * 此模式下会隐藏左侧会话栏，改为顶栏 popover；toolbar 仅保留必要 chip。
+   * 紧凑模式（历史兼容）：会话控制已统一为顶栏右上角「新建对话 + 历史会话」，
+   * 此标记不再改变会话区行为，仅保留入参兼容（文件详情侧栏仍在传）。
    */
   compact?: boolean;
   className?: string;
@@ -271,28 +278,6 @@ const IMAGE_TOOL_STAGE_LABEL: Record<string, string> = {
 
 const KB_SEARCH_TOOLS = new Set(["search_knowledge_base"]);
 const IMAGE_TOOL_NAMES = new Set(["read_image_chunks"]);
-
-/** 圆润灯泡图标（光学中心向左微调，与 Lucide 系列线性图标垂直严格对齐） */
-function ThinkingBulbIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      {/* 饱满圆润的球形灯泡主体（中心 x 坐标微调至 11.2，补偿右侧高光带来的视觉右偏） */}
-      <path d="M8.2 17h6c.6-1 1.4-1.8 2.3-3.2A7.5 7.5 0 1 0 5.9 13.8c.9 1.4 1.7 2.2 2.3 3.2z" />
-      {/* 内部高光反光弧线 */}
-      <path d="M12.8 5.8a4.5 4.5 0 0 1 2.7 3" />
-      {/* 底部短横底座线 */}
-      <path d="M8.7 20.5h5" />
-    </svg>
-  );
-}
 
 /** 适中比例放大镜图标（镜圈半径微调至 6.8，黄金比例舒展） */
 function GrepSearchIcon({ className }: { className?: string }) {
@@ -718,7 +703,7 @@ function addAliasMapping(
 }
 
 /**
- * 从工具结果文本抽出预览用的 chunk 引用（可能是 alias，也可能是真实 id）。
+ * 从工具结果文本抽出预览用的 chunk 引用（LLM 口径，引用一律是 alias）。
  *
  * 覆盖两种结果头：
  *   --- chunk_id=c22, page=8 ---
@@ -763,8 +748,8 @@ function collectToolResultImageRefs(
 /**
  * 把结果文本里的 chunk 引用转成 /raw-image URL。
  *
- * 工具结果对 LLM 只暴露 alias（c12），但 /raw-image 必须用真实 chunk_id。
- * 未解析的 alias 不能拿去请求，否则会 404 成裂图。
+ * 引用一律是 alias（c12），经 aliasToChunkId 查表解析成真实 chunk_id；
+ * 非 alias 形态或查不到映射的跳过（别名不能直接请求，否则 404 裂图）。
  */
 function extractToolResultImages(
   text: string,
@@ -772,9 +757,8 @@ function extractToolResultImages(
 ): Array<{ url: string; caption: string; chunkId: string }> {
   const results: Array<{ url: string; caption: string; chunkId: string }> = [];
   for (const ref of collectToolResultImageRefs(text)) {
-    const chunkId = isChunkAlias(ref.rawId)
-      ? (aliasToChunkId.get(ref.rawId) ?? null)
-      : ref.rawId;
+    if (!isChunkAlias(ref.rawId)) continue;
+    const chunkId = aliasToChunkId.get(ref.rawId);
     if (!chunkId) continue;
     results.push({
       url: buildChunkImageRawUrl(chunkId),
@@ -1051,22 +1035,6 @@ function TraceToolRow({
   const friendlyName = getToolFriendlyName(tc.name);
   const toolSummary = extractToolSummary(tc);
 
-  // 历史落库后 arguments.chunk_ids 可能已是真实 id；与结果头里的 alias 按序对齐补一张表
-  const resolvedAliasMap = useMemo(() => {
-    const map = new Map(aliasToChunkId);
-    const argIds = tc.arguments?.chunk_ids;
-    if (!Array.isArray(argIds) || !tc.result_brief) return map;
-    const refs = collectToolResultImageRefs(tc.result_brief);
-    if (refs.length === 0 || refs.length !== argIds.length) return map;
-    refs.forEach((ref, i) => {
-      const arg = String(argIds[i] ?? "");
-      if (isChunkAlias(ref.rawId) && arg && !isChunkAlias(arg)) {
-        map.set(ref.rawId, arg);
-      }
-    });
-    return map;
-  }, [aliasToChunkId, tc.arguments, tc.result_brief]);
-
   const hasArgs = tc.arguments && Object.keys(tc.arguments).length > 0;
 
   const argsPreview = useMemo(() => {
@@ -1182,7 +1150,7 @@ function TraceToolRow({
           {isImageTool && tc.result_brief ? (
             <ToolResultImageGallery
               text={tc.result_brief}
-              aliasToChunkId={resolvedAliasMap}
+              aliasToChunkId={aliasToChunkId}
             />
           ) : null}
 
@@ -2191,9 +2159,7 @@ function ChatEmptyWelcomeGuide({
   return (
     <div className="mx-auto my-auto flex w-full max-w-2xl flex-col items-center py-6 text-center animate-fadeIn">
       {/* 沉浸式微渐变徽标 */}
-      <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border border-primary/20 text-primary-deep shadow-xs">
-        <Sparkles className="h-7 w-7 text-primary" aria-hidden="true" />
-      </div>
+      <BrandAvatar className="relative mb-4 h-14 w-14 rounded-2xl" />
 
       <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight">
         围绕「{targetName}」展开探索
@@ -2414,9 +2380,7 @@ function ChatTurnBlock({
       <div className="min-w-0 space-y-3 pt-1">
         {/* 头部助手身份标记 */}
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary-deep text-xs font-semibold select-none">
-            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          </div>
+          <BrandAvatar className="h-6 w-6" />
           <span className="text-xs font-medium text-foreground select-none">
             知识库助手
           </span>
@@ -2461,25 +2425,16 @@ function ChatTurnBlock({
           />
         ))}
 
-        {/* 底部：来源芯片 + 操作栏 */}
+        {/* 底部：从左到右 = 引用来源 → 操作栏 */}
         {!isTurnInflight && (hasContent || citedCitations.length > 0) ? (
-          <div className="mt-4 pt-2.5 border-t border-hairline/60 flex flex-wrap items-center justify-between gap-2">
-            {/* 左侧：微型芯片与 token 计数 */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              {citedCitations.length > 0 ? (
-                <ReferencedDocumentsBlock
-                  citations={citedCitations}
-                  onOpenAllSources={onOpenSourcesPanel}
-                />
-              ) : null}
-              {lastMsg?.usage ? (
-                <span className="text-[10.5px] text-muted-faint hidden sm:inline select-none">
-                  tokens: {lastMsg.usage.total_tokens}
-                </span>
-              ) : null}
-            </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t border-hairline/60 pt-2.5">
+            {citedCitations.length > 0 ? (
+              <ReferencedDocumentsBlock
+                citations={citedCitations}
+                onOpenAllSources={onOpenSourcesPanel}
+              />
+            ) : null}
 
-            {/* 右侧：操作按钮组 */}
             <AssistantActionBar messages={assistantMessages} />
           </div>
         ) : null}
@@ -2505,6 +2460,24 @@ interface SessionListProps {
   onDelete: (session: ChatSessionInfo) => void;
 }
 
+/** 会话按最近活动时间分组的组名（今天 / 昨天 / 近 7 天 / 近 30 天 / 更早） */
+function sessionGroupLabel(lastMessageAt?: string | null): string {
+  const time = lastMessageAt ? new Date(lastMessageAt).getTime() : Date.now();
+  if (!Number.isFinite(time)) return "更早";
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  const DAY = 86400000;
+  if (time >= startOfToday) return "今天";
+  if (time >= startOfToday - DAY) return "昨天";
+  if (time >= startOfToday - 7 * DAY) return "近 7 天";
+  if (time >= startOfToday - 30 * DAY) return "近 30 天";
+  return "更早";
+}
+
 function SessionRow({
   session,
   active,
@@ -2521,8 +2494,8 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors",
-        active ? "bg-primary/10" : "hover:bg-gray-100",
+        "group relative flex items-center gap-1 rounded-xl px-2.5 py-1.5 transition-colors",
+        active ? "bg-primary/10" : "bg-gray-100/60 hover:bg-gray-200/70",
       )}
     >
       <button
@@ -2565,7 +2538,7 @@ function SessionRow({
             e.stopPropagation();
             onRename();
           }}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-gray-200 hover:text-foreground"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-white hover:text-foreground"
           title="重命名"
         >
           <Pencil className="h-3 w-3" />
@@ -2576,7 +2549,7 @@ function SessionRow({
             e.stopPropagation();
             onDelete();
           }}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-red-50 hover:text-red-600"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-white hover:text-red-600"
           title="删除"
         >
           <Trash2 className="h-3 w-3" />
@@ -2607,17 +2580,36 @@ function SessionList({
     );
   }
 
+  // 按日期分组渲染（会话列表本身已按最近活动排序，分组保持该顺序）
+  const groups: Array<{ label: string; items: ChatSessionInfo[] }> = [];
+  visible.forEach((session) => {
+    const label = sessionGroupLabel(session.last_message_at);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.items.push(session);
+    } else {
+      groups.push({ label, items: [session] });
+    }
+  });
+
   return (
-    <div className="flex flex-col gap-0.5 px-2">
-      {visible.map((s) => (
-        <SessionRow
-          key={s.session_id}
-          session={s}
-          active={s.session_id === activeSessionId}
-          onSelect={() => onSelect(s.session_id)}
-          onRename={() => onRename(s)}
-          onDelete={() => onDelete(s)}
-        />
+    <div className="flex flex-col gap-1.5 px-2">
+      {groups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-0.5">
+          <div className="px-1 pt-0.5 text-[10.5px] font-medium text-muted-subtle">
+            {group.label}
+          </div>
+          {group.items.map((s) => (
+            <SessionRow
+              key={s.session_id}
+              session={s}
+              active={s.session_id === activeSessionId}
+              onSelect={() => onSelect(s.session_id)}
+              onRename={() => onRename(s)}
+              onDelete={() => onDelete(s)}
+            />
+          ))}
+        </div>
       ))}
       {sessions.length > SESSION_DEFAULT_VISIBLE ? (
         <button
@@ -2650,34 +2642,34 @@ function SessionPopover(props: SessionListProps & { onNew: () => void }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-foreground transition-colors hover:border-primary",
-          open && "border-primary bg-primary/5 text-primary",
+          "flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-foreground transition-colors hover:bg-gray-200 cursor-pointer",
+          open && "bg-gray-200 text-primary ring-1 ring-primary/30",
         )}
         title="历史会话"
         aria-label="历史会话"
       >
-        <Clock className="h-3.5 w-3.5" />
+        <Clock className="h-4 w-4" />
       </button>
       {open ? (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-              <span className="text-xs font-medium text-foreground">会话</span>
+          <div className="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-3.5 py-2.5">
+              <span className="text-xs font-medium text-foreground">历史会话</span>
               <button
                 type="button"
                 onClick={() => {
                   props.onNew();
                   setOpen(false);
                 }}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-foreground hover:border-primary"
-                title="新建会话"
-                aria-label="新建会话"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-foreground hover:border-primary hover:text-primary"
+                title="新建对话"
+                aria-label="新建对话"
               >
                 <Plus className="h-3 w-3" />
               </button>
             </div>
-            <div className="max-h-72 overflow-y-auto py-2">
+            <div className="max-h-80 overflow-y-auto py-2">
               <SessionList
                 sessions={props.sessions}
                 activeSessionId={props.activeSessionId}
@@ -2694,137 +2686,6 @@ function SessionPopover(props: SessionListProps & { onNew: () => void }) {
       ) : null}
     </div>
   );
-}
-
-// ============================================================
-// 会话图标栏 + 可折叠历史面板（默认隐藏）
-// ============================================================
-
-function SessionIconRail({
-  historyOpen,
-  onToggleHistory,
-  onNew,
-}: {
-  historyOpen: boolean;
-  onToggleHistory: () => void;
-  onNew: () => void;
-}) {
-  return (
-    <div className="hidden w-11 shrink-0 flex-col items-center gap-2 bg-gray-50/60 py-3 lg:flex">
-      <button
-        type="button"
-        onClick={onNew}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-primary"
-        title="新建会话"
-        aria-label="新建会话"
-      >
-        <MessageSquarePlus className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={onToggleHistory}
-        className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
-          historyOpen
-            ? "bg-primary/10 text-primary"
-            : "text-muted hover:bg-white hover:text-primary",
-        )}
-        title="历史会话"
-        aria-label="历史会话"
-      >
-        <Clock className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
-
-function SessionDrawer({
-  scopeLabel,
-  sessions,
-  activeSessionId,
-  onClose,
-  onSelect,
-  onRename,
-  onDelete,
-}: SessionListProps & {
-  scopeLabel?: string;
-  onClose: () => void;
-}) {
-  return (
-    <aside className="hidden w-60 shrink-0 flex-col bg-gray-50/60 lg:flex">
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-xs font-medium text-foreground">
-          {scopeLabel ?? "历史会话"}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-gray-100 hover:text-foreground"
-          title="关闭"
-          aria-label="关闭历史会话"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto pb-3">
-        <SessionList
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelect={onSelect}
-          onRename={onRename}
-          onDelete={onDelete}
-        />
-      </div>
-    </aside>
-  );
-}
-
-/**
- * 模型能力图标：思考 / 多模态（仅在模型选择列表中展示）
- */
-function ModelCapabilityIcons({ model }: { model: ChatModelItem }) {
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1">
-      <ThinkingBulbIcon
-        className={cn(
-          "h-3 w-3",
-          model.supports_thinking ? "text-primary" : "text-gray-300",
-        )}
-        aria-label={model.supports_thinking ? "支持思考" : "不支持思考"}
-      />
-      <Eye
-        className={cn(
-          "h-3 w-3",
-          model.supports_multimodal ? "text-primary" : "text-gray-300",
-        )}
-        aria-label={model.supports_multimodal ? "支持多模态" : "不支持多模态"}
-      />
-    </span>
-  );
-}
-
-/** 按模型记忆用户上次使用的思考档位（模型列表里展示"上次用的是什么档"） */
-const MODEL_LEVEL_STORAGE_PREFIX = "knowledge-chat-model-level-v1";
-
-function getLastModelLevel(modelId: string): string | null {
-  if (typeof window === "undefined" || !modelId) return null;
-  try {
-    return window.localStorage.getItem(`${MODEL_LEVEL_STORAGE_PREFIX}:${modelId}`);
-  } catch {
-    return null;
-  }
-}
-
-function setLastModelLevel(modelId: string, level: string): void {
-  if (typeof window === "undefined" || !modelId || !level) return;
-  try {
-    window.localStorage.setItem(
-      `${MODEL_LEVEL_STORAGE_PREFIX}:${modelId}`,
-      level,
-    );
-  } catch {
-    // ignore
-  }
 }
 
 function applyModelSelection(
@@ -2878,477 +2739,6 @@ function applyModelSelection(
     thinkingLevel: nextThinkingLevel,
     enableMultimodal: model.supports_multimodal === true,
   };
-}
-
-const EFFORT_LEVEL_TITLES: Record<string, string> = {
-  off: "Off",
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "XHigh",
-  max: "Max",
-};
-
-/**
- * 统一模型与思考强度选择器（Cursor 风格分步展开双卡片）
- * 交互逻辑：
- *   1. 触发按钮：点击时仅在正上方弹出当前模型信息主卡片（Effort 档位 + Model 项）。
- *   2. 点击主卡片中的 Model 项后，才展开第二张卡片（展示所有模型，顺序为后端分组排序）。
- *   3. 思考强度记忆：默认思考强度根据用户上次选择的强度来定义（并在 localStorage 中持久化）。
- *   4. 自适应方向：第二张卡片默认在右侧显示，若右侧屏幕空间不足则自动切换到左侧显示。
- */
-function UnifiedModelPicker({
-  modelId,
-  thinkingLevel,
-  models,
-  onModelChange,
-  onThinkingLevelChange,
-  disabled,
-}: {
-  modelId: string;
-  thinkingLevel: string;
-  models: ChatModelItem[];
-  onModelChange: (modelId: string) => void;
-  onThinkingLevelChange: (level: string) => void;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [placement, setPlacement] = useState<"right" | "left">("right");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const firstCardRef = useRef<HTMLDivElement>(null);
-
-  // 按模型记忆当前档位：模型列表里每个模型展示"上次使用"的档（开关模型
-  // 显示 On/Off），切回该模型时即可看到并沿用之前的设置
-  useEffect(() => {
-    if (modelId && thinkingLevel) {
-      setLastModelLevel(modelId, thinkingLevel);
-    }
-  }, [modelId, thinkingLevel]);
-
-  // 关闭主浮层时，同时重置子面板和搜索输入
-  useEffect(() => {
-    if (!open) {
-      setShowAllModels(false);
-      setSearchQuery("");
-    }
-  }, [open]);
-
-  // 点击外部区域或按 Esc 键安全收起
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  // 动态测量子卡片位置：默认在右边显示，若右边空间不够则放到左边
-  useLayoutEffect(() => {
-    if (!open || !showAllModels) return;
-    const updatePlacement = () => {
-      if (!firstCardRef.current) return;
-      const rect = firstCardRef.current.getBoundingClientRect();
-      const secondCardWidth = 288; // 子卡片宽度约 288px
-      const spaceOnRight = window.innerWidth - rect.right;
-      if (spaceOnRight < secondCardWidth + 16) {
-        setPlacement("left");
-      } else {
-        setPlacement("right");
-      }
-    };
-
-    updatePlacement();
-    window.addEventListener("resize", updatePlacement);
-    return () => window.removeEventListener("resize", updatePlacement);
-  }, [open, showAllModels]);
-
-  const currentModel = useMemo(() => {
-    return models.find((m) => m.id === modelId) ?? models[0];
-  }, [modelId, models]);
-
-  const displayModelLabel = useMemo(() => {
-    if (!modelId) return "选择模型";
-    if (currentModel) return currentModel.label;
-    const slash = modelId.lastIndexOf("/");
-    return slash >= 0 ? modelId.slice(slash + 1) : modelId;
-  }, [modelId, currentModel]);
-
-  const switchOnlyThinking = isSwitchOnlyThinking(
-    currentModel?.thinking_levels,
-  );
-  const effortThinking = isEffortThinking(currentModel?.thinking_levels);
-  const onThinkingLevel = getOnThinkingLevel(currentModel?.thinking_levels);
-
-  const currentEffortLabel = useMemo(() => {
-    if (!currentModel?.supports_thinking || thinkingLevel === "off")
-      return null;
-    if (switchOnlyThinking) return "Thinking";
-    return EFFORT_LEVEL_TITLES[thinkingLevel] ?? thinkingLevel;
-  }, [currentModel, thinkingLevel, switchOnlyThinking]);
-
-  /**
-   * 移动端触发按钮的文案：只表达思考档位。
-   * 关闭或模型不支持思考时恒为「关」，模型列表尚未加载时退回「模型」。
-   */
-  const mobileThinkingLabel = currentEffortLabel ?? (currentModel ? "关" : "模型");
-
-  // 当前模型支持的思考档位
-  const availableThinkingLevels = useMemo(() => {
-    if (!currentModel?.supports_thinking) return [];
-    return currentModel.thinking_levels?.length
-      ? currentModel.thinking_levels
-      : ["off"];
-  }, [currentModel]);
-
-  // 展示顺序完全由后端分组排序（provider 分组、组内按名称）决定；
-  // 本地仅保留搜索过滤，不做任何重排。
-  const displayedModels = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      return models.filter(
-        (m) =>
-          m.label.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q) ||
-          m.provider.toLowerCase().includes(q),
-      );
-    }
-    return models;
-  }, [models, searchQuery]);
-
-  return (
-    // 移动端保持 static：浮层改为相对输入框整宽展开（见下方 bottom-full left-0 right-0），
-    // sm 以上才把定位上下文收回按钮自身，维持原来的右对齐浮层。
-    <div className="shrink-0 sm:relative" ref={containerRef}>
-      {/* 底部触发按钮 */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) setOpen((v) => !v);
-        }}
-        className={cn(
-          "flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs text-neutral-700 transition-colors hover:bg-neutral-100/80 hover:text-neutral-900",
-          open && "bg-neutral-100 text-neutral-900",
-          disabled && "cursor-not-allowed opacity-60",
-        )}
-        title={
-          currentModel?.supports_thinking && thinkingLevel !== "off"
-            ? switchOnlyThinking
-              ? `${displayModelLabel} · Thinking on`
-              : `${displayModelLabel} · 思考: ${THINKING_LEVEL_LABELS[thinkingLevel] ?? thinkingLevel}`
-            : displayModelLabel
-        }
-      >
-        {/* 移动端：只留思考档位（无档位时显示「关」），模型名只在弹层里出现 */}
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 sm:hidden",
-            currentEffortLabel ? "text-primary-deep" : "text-neutral-500",
-          )}
-        >
-          <ThinkingBulbIcon className="h-3 w-3 shrink-0" />
-          {mobileThinkingLabel}
-        </span>
-        <span className="hidden font-normal sm:inline">{displayModelLabel}</span>
-        {currentEffortLabel ? (
-          <span className="hidden text-neutral-400 font-normal sm:inline">
-            {currentEffortLabel}
-          </span>
-        ) : null}
-        <ChevronDown className="h-3 w-3 shrink-0 text-neutral-400 opacity-80" />
-      </button>
-
-      {/* 弹出浮层：主卡片弹出在正上方 */}
-      {open ? (
-        <div
-          className={cn(
-            "absolute bottom-full z-50 mb-2 select-none max-w-[calc(100vw-1.5rem)]",
-            // 移动端：贴着输入框整宽展开，左右都不出屏
-            "left-0 right-0",
-            // sm 以上：回到触发按钮正上方的右对齐浮层
-            "sm:left-auto sm:right-0 sm:w-auto"
-          )}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 主卡片（正上方）：Effort 思考强度选择 + Model 切换入口。
-              移动端展开模型列表时整张让位给列表卡片（见下方），避免两张卡上下叠高。 */}
-          <div
-            ref={firstCardRef}
-            className={cn(
-              "w-full sm:w-44 max-w-[calc(100vw-2rem)] shrink-0 rounded-2xl border border-neutral-200/90 bg-white p-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-100 relative",
-              showAllModels && "hidden sm:block",
-            )}
-          >
-            {/* 思考：强度模型显示 Effort；开关模型显示关/开 */}
-            <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
-              {switchOnlyThinking ? "Thinking" : "Effort"}
-            </div>
-            {effortThinking ? (
-              <div className="space-y-0.5">
-                {availableThinkingLevels.map((lvl) => {
-                  const isSelected = thinkingLevel === lvl;
-                  const label = EFFORT_LEVEL_TITLES[lvl] ?? lvl;
-                  return (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => {
-                        setSettingsDefaultThinkingLevel(lvl);
-                        onThinkingLevelChange(lvl);
-                        setOpen(false);
-                      }}
-                      title={THINKING_LEVEL_DESCS[lvl]}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-neutral-100",
-                        isSelected
-                          ? "bg-neutral-100/90 font-medium text-neutral-900"
-                          : "text-neutral-700",
-                      )}
-                    >
-                      <span>{label}</span>
-                      {isSelected ? (
-                        <Check className="h-3.5 w-3.5 text-neutral-900 shrink-0 ml-1" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : switchOnlyThinking ? (
-              <div className="space-y-0.5">
-                {(
-                  [
-                    { lvl: "off", label: "关" },
-                    { lvl: onThinkingLevel, label: "开" },
-                  ] as const
-                ).map((it) => {
-                  const isSelected =
-                    thinkingLevel === it.lvl ||
-                    (it.label === "开" && thinkingLevel !== "off");
-                  return (
-                    <button
-                      key={it.lvl}
-                      type="button"
-                      onClick={() => {
-                        setSettingsDefaultThinkingLevel(it.lvl);
-                        onThinkingLevelChange(it.lvl);
-                        setOpen(false);
-                      }}
-                      title={it.label === "开" ? "开启思考链" : "关闭思考链"}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-neutral-100",
-                        isSelected
-                          ? "bg-neutral-100/90 font-medium text-neutral-900"
-                          : "text-neutral-700",
-                      )}
-                    >
-                      <span>{it.label}</span>
-                      {isSelected ? (
-                        <Check className="h-3.5 w-3.5 text-neutral-900 shrink-0 ml-1" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="px-2.5 py-1.5 text-xs text-neutral-400">
-                不支持思考
-              </div>
-            )}
-
-            <div className="my-1.5 h-px bg-neutral-100" />
-
-            {/* Model 展开按钮：点击后才显示所有模型的卡片 */}
-            <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
-              Model
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAllModels((v) => !v)}
-              className={cn(
-                "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors hover:bg-neutral-100",
-                showAllModels
-                  ? "bg-neutral-100 text-neutral-900"
-                  : "bg-neutral-50/70 text-neutral-800",
-              )}
-            >
-              <span className="truncate">{displayModelLabel}</span>
-              <ChevronRight
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform",
-                  showAllModels &&
-                    (placement === "left"
-                      ? "-translate-x-0.5 text-neutral-700"
-                      : "translate-x-0.5 text-neutral-700"),
-                )}
-              />
-            </button>
-          </div>
-
-          {/* 第二张卡片：所有模型具体信息（点击 Model 后展开）。
-              与主卡片同级：主卡片在移动端 hidden 时才不会连带把它一起 display:none，
-              桌面端依旧靠 left-full / right-full 贴在主卡片左右两侧。 */}
-          {showAllModels ? (
-            <div
-              className={cn(
-                "w-full max-w-[calc(100vw-2rem)] rounded-2xl border border-neutral-200/90 bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100",
-                "sm:absolute sm:bottom-0 sm:w-72",
-                placement === "right"
-                  ? "sm:left-full sm:ml-1.5"
-                  : "sm:right-full sm:mr-1.5",
-              )}
-            >
-              {/* 顶部搜索框（移动端带返回，回到思考档位卡片） */}
-              <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 bg-neutral-50/50">
-                <button
-                  type="button"
-                  onClick={() => setShowAllModels(false)}
-                  className="-ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:text-neutral-700 sm:hidden"
-                  title="返回思考设置"
-                  aria-label="返回思考设置"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-                <input
-                  autoFocus
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search models"
-                  className="min-w-0 flex-1 bg-transparent text-xs text-neutral-900 outline-none placeholder:text-neutral-400"
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="text-neutral-400 hover:text-neutral-600"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                ) : null}
-              </div>
-
-              {/* 模型列表（移动端按视口高度收敛，避免小屏上顶出屏幕） */}
-              <div className="max-h-[45vh] overflow-y-auto p-1.5 space-y-0.5 sm:max-h-72">
-                {models.length === 0 ? (
-                  <div className="flex items-center justify-center gap-2 py-8 text-xs text-neutral-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>加载模型中…</span>
-                  </div>
-                ) : displayedModels.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-neutral-400">
-                    未找到匹配模型
-                  </div>
-                ) : (
-                  displayedModels.map((m) => {
-                    const isSelected = m.id === modelId;
-                    // 档位角标：选中的模型显示当前档；未选中的显示该模型
-                    // 上次使用的档（无记忆时回退模型默认档）。
-                    // 开关模型（仅 off/medium 两档）统一显示英文 On/Off——
-                    // ``medium`` 是内部的「开」哨兵，不能被误展示为 Medium；
-                    // 强度模型显示档位标题，Off 档不展示角标（保持原行为）。
-                    const toggleModel = !isEffortThinking(m.thinking_levels);
-                    const remembered = isSelected
-                      ? null
-                      : getLastModelLevel(m.id);
-                    // 开关模型无记忆时默认 On（显式回退 medium，不依赖
-                    // 后端 default）；强度模型回退模型默认档
-                    const activeLevel = isSelected
-                      ? thinkingLevel
-                      : toggleModel
-                        ? (remembered ?? "medium")
-                        : (remembered ?? (m.default_thinking_level || "medium"));
-                    const effortText = toggleModel
-                      ? activeLevel === "off"
-                        ? "Off"
-                        : "On"
-                      : (EFFORT_LEVEL_TITLES[activeLevel] ??
-                        (isSelected ? thinkingLevel : "Medium"));
-
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          onModelChange(m.id);
-                          setOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-neutral-100",
-                          isSelected
-                            ? "bg-neutral-100/90 font-medium text-neutral-900"
-                            : "text-neutral-700",
-                        )}
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "truncate",
-                              isSelected
-                                ? "font-medium text-neutral-900"
-                                : "text-neutral-700",
-                            )}
-                          >
-                            {m.label}
-                          </span>
-                          {effortText &&
-                          (toggleModel || effortText !== "Off") ? (
-                            <span className="shrink-0 text-[11px] text-neutral-400 font-normal">
-                              {effortText}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-1.5 ml-1.5">
-                          <ModelCapabilityIcons model={m} />
-                          {isSelected ? (
-                            <Check className="h-3.5 w-3.5 text-neutral-900 shrink-0" />
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* 底部信息条 */}
-              <div className="border-t border-neutral-100 px-3 py-1.5 bg-neutral-50/50 flex items-center justify-between text-[10px] text-neutral-400">
-                <span>
-                  {searchQuery
-                    ? `${displayedModels.length} 个结果`
-                    : `共 ${models.length} 个模型`}
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-0.5">
-                    <ThinkingBulbIcon className="h-2.5 w-2.5 text-primary" /> 思考
-                  </span>
-                  <span className="inline-flex items-center gap-0.5">
-                    <Eye className="h-2.5 w-2.5 text-primary" /> 视觉
-                  </span>
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 /**
@@ -3815,7 +3205,6 @@ export const KnowledgeChatPanel = ({
   disabledReason,
   noticeBanner,
   enabled = true,
-  compact = false,
   className,
   onToggleMobileTree,
 }: KnowledgeChatPanelProps) => {
@@ -3848,6 +3237,19 @@ export const KnowledgeChatPanel = ({
     stop,
     clearError,
   } = chat;
+
+  // session 平均缓存命中率（token 加权 Σcached/Σprompt；无数据 null）
+  const sessionCacheRate = (() => {
+    let cached = 0;
+    let prompt = 0;
+    for (const m of messages) {
+      const u = m.usage;
+      if (!u?.prompt_tokens) continue;
+      prompt += u.prompt_tokens;
+      cached += u.cached_tokens ?? 0;
+    }
+    return prompt > 0 && cached > 0 ? cached / prompt : null;
+  })();
 
   // input 是编辑器纯文本镜像（用于发送禁用判断 / slash 触发 / 布局），
   // 真正的富文本与 pill 由 MentionComposer 维护。
@@ -3959,7 +3361,6 @@ export const KnowledgeChatPanel = ({
     params?: Record<string, unknown>;
     recallStats?: RecallStats;
   } | null>(null);
-  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
 
   // 切换 session / 模型清单到位时，同步 chip 默认值。
   //
@@ -4375,12 +3776,6 @@ export const KnowledgeChatPanel = ({
     ? "当前上下文不可问答"
     : "描述你想要查询的内容，/调用指令和技能，@知识库中的文件";
 
-  const sessionScopeLabel = selectedFolderName
-    ? `文件夹「${selectedFolderName}」`
-    : knowledgeBaseName
-      ? `知识库「${knowledgeBaseName}」`
-      : "历史会话";
-
   // 转换消息列表为轮次结构（Turn-based）并累积跨轮 citations
   const chatTurns = useMemo(() => {
     return groupMessagesIntoTurns(messages);
@@ -4402,31 +3797,6 @@ export const KnowledgeChatPanel = ({
         className,
       )}
     >
-      {/* 左侧图标栏 + 可折叠历史面板（默认隐藏） */}
-      {!compact ? (
-        <>
-          <SessionIconRail
-            historyOpen={sessionPanelOpen}
-            onToggleHistory={() => setSessionPanelOpen((v) => !v)}
-            onNew={() => void handleNewSession()}
-          />
-          {sessionPanelOpen ? (
-            <SessionDrawer
-              scopeLabel={sessionScopeLabel}
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onClose={() => setSessionPanelOpen(false)}
-              onSelect={(id) => {
-                void handleSelectSession(id);
-                setSessionPanelOpen(false);
-              }}
-              onRename={handleSessionRename}
-              onDelete={handleSessionDelete}
-            />
-          ) : null}
-        </>
-      ) : null}
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* 顶部全宽状态栏。
             relative 是 ContextIndicator 移动端浮层（占满头部宽度）的定位上下文，
@@ -4492,54 +3862,30 @@ export const KnowledgeChatPanel = ({
                       · {activeSession.message_count} 条消息
                     </span>
                   ) : null}
+
                 </div>
               </div>
             </div>
 
-            {/* 右侧：上下文指示器 + 会话控制 */}
-            <div className="flex items-center gap-2 shrink-0">
-              <ContextIndicator report={contextStatus} />
-              {compact ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => void handleNewSession()}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-hairline bg-white text-muted transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
-                    title="新建会话"
-                    aria-label="新建会话"
-                  >
-                    <MessageSquarePlus className="h-3.5 w-3.5" />
-                  </button>
-                  <SessionPopover
-                    sessions={sessions}
-                    activeSessionId={activeSessionId}
-                    onSelect={(id) => void handleSelectSession(id)}
-                    onNew={() => void handleNewSession()}
-                    onRename={handleSessionRename}
-                    onDelete={handleSessionDelete}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 lg:hidden">
-                  <button
-                    type="button"
-                    onClick={() => void handleNewSession()}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-hairline bg-white text-muted transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
-                    title="新建会话"
-                    aria-label="新建会话"
-                  >
-                    <MessageSquarePlus className="h-3.5 w-3.5" />
-                  </button>
-                  <SessionPopover
-                    sessions={sessions}
-                    activeSessionId={activeSessionId}
-                    onSelect={(id) => void handleSelectSession(id)}
-                    onNew={() => void handleNewSession()}
-                    onRename={handleSessionRename}
-                    onDelete={handleSessionDelete}
-                  />
-                </div>
-              )}
+            {/* 右侧：会话控制（新建对话 + 历史会话弹层；上下文指示器已挪至输入框底栏） */}
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleNewSession()}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-hairline bg-white text-foreground transition-colors hover:border-primary hover:text-primary cursor-pointer"
+                title="新建对话"
+                aria-label="新建对话"
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+              </button>
+              <SessionPopover
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onSelect={(id) => void handleSelectSession(id)}
+                onNew={() => void handleNewSession()}
+                onRename={handleSessionRename}
+                onDelete={handleSessionDelete}
+              />
             </div>
           </div>
         </div>
@@ -4902,6 +4248,11 @@ export const KnowledgeChatPanel = ({
                             />
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5">
+                            {/* 上下文构成 + 缓存命中（ZCode 式：小圈=缓存，浮层=构成） */}
+                            <ContextIndicator
+                              report={contextStatus}
+                              cacheRate={sessionCacheRate}
+                            />
                             <UnifiedModelPicker
                               modelId={settings.model}
                               thinkingLevel={settings.thinkingLevel}
@@ -4970,6 +4321,11 @@ export const KnowledgeChatPanel = ({
                       ) : (
                         <>
                           <div className="shrink-0 flex items-center gap-1.5">
+                            {/* 上下文构成 + 缓存命中（单行布局分支，与多行分支同款） */}
+                            <ContextIndicator
+                              report={contextStatus}
+                              cacheRate={sessionCacheRate}
+                            />
                             <UnifiedModelPicker
                               modelId={settings.model}
                               thinkingLevel={settings.thinkingLevel}
