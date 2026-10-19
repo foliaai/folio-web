@@ -36,6 +36,68 @@ export function genderText(gender?: number | null): string | null {
   return null;
 }
 
+/** 部门成员条目（建团队「从部门导入」用，auth-server /api/orgs） */
+export interface OrgMemberItem {
+  user_id: string;
+  is_main: boolean;
+}
+
+export interface OrgMembersData {
+  department_id: number;
+  department_name: string;
+  members: OrgMemberItem[];
+}
+
+/** 用户搜索结果条目（邀请成员用，auth-server /api/users/search） */
+export interface UserSearchItem {
+  user_id: string;
+  display_name: string;
+}
+
+/**
+ * 按部门拉成员列表（JP 建团队导入快照；走 authApiUrl）。
+ * 组织不存在（含 prd 无组织数据）返回 null，调用方按数据驱动隐藏入口。
+ */
+export async function getOrgMembers(
+  departmentId: number
+): Promise<OrgMembersData | null> {
+  try {
+    const url = authApiUrl(
+      `/orgs/${encodeURIComponent(departmentId)}/members`
+    );
+    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    if (!res.ok) return null;
+    const json = { code: 0, message: "", ...(await res.json()) } as {
+      data?: OrgMembersData;
+    };
+    return json.data ?? null;
+  } catch (err) {
+    console.error("[getOrgMembers] 异常:", err);
+    return null;
+  }
+}
+
+/**
+ * 搜索用户（邀请成员，昵称/用户ID 模糊匹配；防枚举：关键词 ≥2 字符、上限 20 条）。
+ * 关键词过短由后端 400，这里直接返回空数组避免无谓请求。
+ */
+export async function searchUsers(q: string): Promise<UserSearchItem[]> {
+  const keyword = q.trim();
+  if (keyword.length < 2) return [];
+  try {
+    const url = authApiUrl(
+      `/users/search?q=${encodeURIComponent(keyword)}&limit=20`
+    );
+    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { users?: UserSearchItem[] } };
+    return json.data?.users ?? [];
+  } catch (err) {
+    console.error("[searchUsers] 异常:", err);
+    return [];
+  }
+}
+
 export interface UserProfileResponse {
   code: number;
   message: string;

@@ -85,6 +85,8 @@ export interface TokenUsageRecord {
   completion_tokens: number;
   thinking_tokens?: number | null;
   total_tokens: number;
+  /** 前缀缓存命中数（命中率 = cached/prompt；session 级按 token 加权） */
+  cached_tokens?: number;
 }
 
 export interface ChatMessage {

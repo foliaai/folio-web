@@ -9,12 +9,14 @@ import {
   FolderDeleteResponse,
   FolderInfo,
   KnowledgeBaseInfo,
+  KnowledgeBaseListPermissions,
   KnowledgeFile,
 } from "@/lib/knowledge-types";
 
 interface KnowledgeBaseListResponse {
   knowledge_bases: KnowledgeBaseInfo[];
   total: number;
+  permissions?: KnowledgeBaseListPermissions;
 }
 
 interface FolderListResponse {
@@ -231,17 +233,30 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-export async function fetchKnowledgeBases(): Promise<KnowledgeBaseInfo[]> {
+/** 拉取可访问的知识库列表（个人 + 所在团队 + 公共） */
+export async function fetchKnowledgeBases(): Promise<{
+  knowledgeBases: KnowledgeBaseInfo[];
+  permissions: KnowledgeBaseListPermissions;
+}> {
   const data = await requestJson<KnowledgeBaseListResponse>("/api/knowledge/base/list", {
     method: "GET",
   });
-  return data.knowledge_bases ?? [];
+  return {
+    knowledgeBases: data.knowledge_bases ?? [],
+    permissions: {
+      can_create_public: data.permissions?.can_create_public ?? false,
+    },
+  };
 }
 
 export async function createKnowledgeBase(input: {
   knowledge_base_name: string;
   description?: string;
   parent_knowledge_base_id?: string | null;
+  /** 可见性：private（默认）/ team / public */
+  visibility?: string;
+  /** visibility=team 时必填：绑定的团队ID */
+  team_id?: string | null;
 }): Promise<KnowledgeBaseInfo> {
   return requestJson<KnowledgeBaseInfo>("/api/knowledge/base/create", {
     method: "POST",
