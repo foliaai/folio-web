@@ -578,21 +578,21 @@ export const KbFilePanel = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      {/* 信息区：知识库身份与统计，预留后续补充基础信息（描述 / 创建者等）
-          的空间——min-h 保持留白，底色与内容区分隔、不用边线
-          （避免与左侧列表头部的水平线错位） */}
-      <div className="flex min-h-[84px] shrink-0 flex-col justify-center gap-1.5 bg-gray-50/60 px-3 py-3">
-        <div className="flex items-center gap-2">
+      {/* 信息区：知识库身份与统计，预留后续补充基础信息的空间。
+          第一行与左侧列表头部同几何（h-12 items-center px-3）——库名与「知识库」
+          标题同水平线，折叠态展开按钮与展开态收起按钮完全同位（视觉不动） */}
+      <div className="flex min-h-[84px] shrink-0 flex-col bg-gray-50/60 px-3 pb-3">
+        <div className="flex h-12 shrink-0 items-center gap-2">
           {onExpandList ? (
             <button
               type="button"
               onClick={onExpandList}
               aria-expanded={false}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground cursor-pointer"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground cursor-pointer"
               title="展开知识库列表"
               aria-label="展开知识库列表"
             >
-              <PanelLeftOpen className="h-3.5 w-3.5" />
+              <PanelLeftOpen className="h-4 w-4" />
             </button>
           ) : null}
           <Database className="h-4 w-4 shrink-0 text-primary" />
@@ -618,7 +618,8 @@ export const KbFilePanel = ({
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 pl-6 text-[11px] text-muted-subtle">
+        {/* 统计行对齐库名起点（px-3 + 图标 16 + gap 8 = 36px） */}
+        <div className="flex items-center gap-1.5 pl-9 text-[11px] text-muted-subtle">
           <span>{kb.fileCount} 个文件</span>
           {kb.lastUpdated ? (
             <span className="text-muted-faint">· 最近更新 {kb.lastUpdated}</span>

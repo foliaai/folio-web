@@ -273,20 +273,21 @@ export const KnowledgeTree = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      {/* h-12 与右侧文件区信息栏等高，两侧水平线连成一条 */}
+      {/* h-12 与右侧文件区信息区第一行同几何：标题文字同水平线、
+          折叠按钮与折叠态展开按钮完全同位（视觉不动） */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-gray-200 px-3">
-        {/* 收起按钮放最左：收起后导轨上的展开按钮落在同一位置，
-            切换时按钮原地不动、只翻图标方向 */}
+        {/* 收起按钮放最左：与右侧信息区的展开按钮同形（h-7 w-7）同位，
+            切换时原地只翻图标方向 */}
         {onCollapse ? (
           <button
             type="button"
             onClick={onCollapse}
             aria-expanded
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground"
             title="收起知识库列表"
             aria-label="收起知识库列表"
           >
-            <PanelLeftClose className="h-3.5 w-3.5" />
+            <PanelLeftClose className="h-4 w-4" />
           </button>
         ) : null}
         <div className="flex min-w-0 flex-1 items-center text-sm font-medium text-foreground">
@@ -300,13 +301,13 @@ export const KnowledgeTree = ({
               if (searchOpen && onSearchChange) onSearchChange("");
             }}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground",
+              "flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-gray-100 hover:text-foreground",
               searchOpen && "bg-gray-100 text-foreground"
             )}
             title="搜索知识库"
             aria-label="搜索"
           >
-            <Search className="h-3.5 w-3.5" />
+            <Search className="h-4 w-4" />
           </button>
           {onCreateKb ? (
             <button
