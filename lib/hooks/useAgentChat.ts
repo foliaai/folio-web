@@ -35,6 +35,8 @@ import type {
   AgentStartPayload,
   UiAgentMessage,
 } from "@/lib/agent-chat-types";
+import { getAuthToken } from "@/lib/auth";
+import { handleAuthExpired, isTokenExpired } from "@/lib/auth-expired";
 
 export type AgentConnectionState = "connecting" | "open" | "closed";
 
@@ -338,6 +340,11 @@ export function useAgentChat(): UseAgentChatResult {
       onClose: () => {
         setConnection("closed");
         wsRef.current = null;
+        // 凭证已过期：重连握手必被拒（无限退避死循环），直接走全局过期跳转
+        if (isTokenExpired(getAuthToken())) {
+          handleAuthExpired();
+          return;
+        }
         // 指数退避重连：1s → 2s → 5s（封顶）
         const delay = [1000, 2000, 5000][Math.min(retryRef.current, 2)];
         retryRef.current += 1;

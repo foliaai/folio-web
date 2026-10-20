@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { authFetch } from "@/lib/api/http";
 import { API_CONFIG, getChatWsUrl, getCommonHeaders } from "@/lib/config";
 import type {
   AgentClientFrame,
@@ -114,7 +115,7 @@ export async function fetchAgentModels(): Promise<AgentModelItem[]> {
   const next: Record<string, string> = {};
   if (headers.Authorization) next.Authorization = headers.Authorization;
 
-  const resp = await fetch(`${API_CONFIG.BASE_URL}/api/v1/models`, {
+  const resp = await authFetch(`${API_CONFIG.BASE_URL}/api/v1/models`, {
     headers: next,
   });
   if (!resp.ok) {
@@ -169,7 +170,7 @@ async function sessionsFetch(path: string, init?: RequestInit): Promise<Response
   const next: Record<string, string> = { "Content-Type": headers["Content-Type"] };
   if (headers.Authorization) next.Authorization = headers.Authorization;
   if (init?.body) next["Content-Type"] = "application/json";
-  return fetch(`${API_CONFIG.BASE_URL}/api/v1/sessions${path}`, {
+  return authFetch(`${API_CONFIG.BASE_URL}/api/v1/sessions${path}`, {
     ...init,
     headers: next,
   });
@@ -214,7 +215,7 @@ async function filesFetch(path: string, init?: RequestInit): Promise<Response> {
   if (extra) {
     for (const [k, v] of Object.entries(extra)) next[k] = v;
   }
-  return fetch(`${API_CONFIG.BASE_URL}${path}`, { ...init, headers: next });
+  return authFetch(`${API_CONFIG.BASE_URL}${path}`, { ...init, headers: next });
 }
 
 /**
