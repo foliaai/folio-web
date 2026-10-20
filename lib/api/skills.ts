@@ -2,6 +2,7 @@
  * 技能 REST API 客户端
  * 调用 skill-service 的 /skills 端点
  */
+import { authFetch } from "@/lib/api/http";
 import { getCommonHeaders } from "@/lib/config";
 
 /**
@@ -79,7 +80,7 @@ export async function fetchSkills(params?: {
         : undefined,
   });
 
-  const resp = await fetch(url, {
+  const resp = await authFetch(url, {
     headers: getCommonHeaders(),
   }).catch((err: unknown) => {
     throw new Error(
@@ -95,7 +96,7 @@ export async function fetchSkills(params?: {
 export async function fetchSkillDetail(
   name: string
 ): Promise<SkillDetail> {
-  const resp = await fetch(skillApiUrl(`/skills/${encodeURIComponent(name)}`), {
+  const resp = await authFetch(skillApiUrl(`/skills/${encodeURIComponent(name)}`), {
     headers: getCommonHeaders(),
   });
   if (!resp.ok) throw new Error(`fetchSkillDetail failed: ${resp.status}`);
@@ -105,7 +106,7 @@ export async function fetchSkillDetail(
 }
 
 export async function createSkill(body: string): Promise<SkillDescriptor> {
-  const resp = await fetch(skillApiUrl("/skills"), {
+  const resp = await authFetch(skillApiUrl("/skills"), {
     method: "POST",
     headers: getCommonHeaders(),
     body: JSON.stringify({ body }),
@@ -123,7 +124,7 @@ export async function updateSkill(
   name: string,
   body: string
 ): Promise<SkillDescriptor> {
-  const resp = await fetch(
+  const resp = await authFetch(
     skillApiUrl(`/skills/${encodeURIComponent(name)}`),
     {
       method: "PUT",
@@ -144,7 +145,7 @@ export async function setSkillEnabled(
   name: string,
   enabled: boolean
 ): Promise<void> {
-  const resp = await fetch(
+  const resp = await authFetch(
     skillApiUrl(`/skills/${encodeURIComponent(name)}/enabled`),
     {
       method: "PATCH",
@@ -175,7 +176,7 @@ export async function uploadSkillCover(
   const formData = new FormData();
   formData.append("file", file);
 
-  const resp = await fetch(url, {
+  const resp = await authFetch(url, {
     method: "POST",
     headers: nextHeaders,
     body: formData,
@@ -192,7 +193,7 @@ export async function uploadSkillCover(
 }
 
 export async function deleteSkillCover(name: string): Promise<void> {
-  const resp = await fetch(
+  const resp = await authFetch(
     skillApiUrl(`/skills/${encodeURIComponent(name)}/cover`),
     {
       method: "DELETE",
@@ -203,7 +204,7 @@ export async function deleteSkillCover(name: string): Promise<void> {
 }
 
 export async function deleteSkill(name: string): Promise<void> {
-  const resp = await fetch(
+  const resp = await authFetch(
     skillApiUrl(`/skills/${encodeURIComponent(name)}`),
     {
       method: "DELETE",

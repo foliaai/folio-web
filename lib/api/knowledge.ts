@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/http";
+import { handleAuthExpired } from "@/lib/auth-expired";
 import { API_CONFIG, getCommonHeaders, getQueryAuthToken } from "@/lib/config";
 import {
   ApiResponse,
@@ -185,6 +187,7 @@ async function requestJsonWithUploadProgress<T>(
           : null;
 
         if (xhr.status < 200 || xhr.status >= 300) {
+          if (xhr.status === 401) handleAuthExpired();
           const error = payload as
             | {
                 detail?: string;
@@ -217,7 +220,7 @@ async function requestJsonWithUploadProgress<T>(
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildKnowledgeUrl(path), {
+  const response = await authFetch(buildKnowledgeUrl(path), {
     ...init,
     headers: buildHeaders(init),
   });
