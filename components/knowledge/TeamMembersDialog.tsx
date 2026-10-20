@@ -8,12 +8,14 @@ import {
   updateTeamMemberRole,
   type TeamDetail,
 } from "@/lib/api/team";
-import { getOrgMembers, getUserProfile, searchUsers } from "@/lib/api/user";
+import { getOrgMembers, getProfilesBatch, getUserProfile, searchUsers } from "@/lib/api/user";
 import type {
   UserDepartmentItem,
+  UserProfileBrief,
   UserSearchItem,
 } from "@/lib/api/user";
 import { ConfirmModal, type ConfirmAction } from "@/components/knowledge/ConfirmModal";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -70,6 +72,9 @@ export function TeamMembersDialog({
   const [mainDept, setMainDept] = useState<UserDepartmentItem | null>(null);
   const [quickInviting, setQuickInviting] = useState(false);
 
+  // 成员档案（显示名 + 头像；查不到时按工号回退渲染）
+  const [profileMap, setProfileMap] = useState<Record<string, UserProfileBrief>>({});
+
   const notify = useCallback((message: string) => {
     setNotice(message);
     onChanged?.(message);
@@ -97,6 +102,19 @@ export function TeamMembersDialog({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 成员名单到位后批量拉档案（渲染显示名 + 头像；接口缺席/失败静默回退工号）
+  useEffect(() => {
+    const ids = detail?.members.map((m) => m.user_id) ?? [];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void getProfilesBatch(ids).then((map) => {
+      if (!cancelled) setProfileMap(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail]);
 
   useEffect(() => {
     // JP：取主部门（is_main 优先）供快速邀请；prd 无 departments 自然不出现
@@ -346,65 +364,72 @@ export function TeamMembersDialog({
 
               {/* 成员列表 */}
               <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200">
-                {detail.members.map((member) => (
-                  <li
-                    key={member.user_id}
-                    className="flex items-center justify-between gap-2 px-3.5 py-2.5"
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-muted">
-                        {member.user_id.slice(0, 2).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm text-foreground">
-                          {member.user_id}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {ROLE_LABEL[member.role] ?? member.role}
-                          {member.joined_time
-                            ? ` · ${member.joined_time.slice(0, 10)} 加入`
-                            : ""}
-                        </p>
+                {detail.members.map((member) => {
+                  const profile = profileMap[member.user_id];
+                  return (
+                    <li
+                      key={member.user_id}
+                      className="flex items-center justify-between gap-2 px-3.5 py-2.5"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <UserAvatar
+                          userId={member.user_id}
+                          avatarUrl={profile?.avatar_url ?? null}
+                          name={profile?.display_name ?? member.user_id}
+                          size="sm"
+                          shape="rounded-full"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-foreground">
+                            {profile?.display_name ?? member.user_id}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {ROLE_LABEL[member.role] ?? member.role}
+                            {member.joined_time
+                              ? ` · ${member.joined_time.slice(0, 10)} 加入`
+                              : ""}
+                          </p>
+                        </div>
+                        {member.role === "admin" ? (
+                          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        ) : null}
                       </div>
-                      {member.role === "admin" ? (
-                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                      ) : null}
-                    </div>
-                    {isOwner && member.role !== "owner" ? (
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => void handleToggleRole(member.user_id, member.role)}
-                          title={member.role === "admin" ? "降为普通成员" : "设为管理员"}
-                          aria-label={`${member.role === "admin" ? "降为普通成员" : "设为管理员"} ${member.user_id}`}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-gray-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
-                        >
-                          <ShieldCheck className="h-3.5 w-3.5" />
-                        </button>
+                      {isOwner && member.role !== "owner" ? (
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleRole(member.user_id, member.role)}
+                            title={member.role === "admin" ? "降为普通成员" : "设为管理员"}
+                            aria-label={`${member.role === "admin" ? "降为普通成员" : "设为管理员"} ${profile?.display_name ?? member.user_id}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-gray-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(member.user_id, member.role)}
+                            title="移除成员"
+                            aria-label={`移除成员 ${profile?.display_name ?? member.user_id}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : isManager &&
+                        member.role === "member" ? (
                         <button
                           type="button"
                           onClick={() => handleRemoveMember(member.user_id, member.role)}
                           title="移除成员"
-                          aria-label={`移除成员 ${member.user_id}`}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 cursor-pointer"
+                          aria-label={`移除成员 ${profile?.display_name ?? member.user_id}`}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 cursor-pointer"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      </div>
-                    ) : isManager &&
-                      member.role === "member" ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMember(member.user_id, member.role)}
-                        title="移除成员"
-                        aria-label={`移除成员 ${member.user_id}`}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
 
               {/* 我的角色（成员组随库生灭，无团队级操作） */}

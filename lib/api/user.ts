@@ -77,6 +77,38 @@ export async function getOrgMembers(
   }
 }
 
+export interface UserProfileBrief {
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+}
+
+/**
+ * 批量获取用户档案摘要（团队成员列表渲染显示名 + 头像）。
+ * 查不到的 id 静默缺席，调用方按工号回退。
+ */
+export async function getProfilesBatch(
+  userIds: string[]
+): Promise<Record<string, UserProfileBrief>> {
+  const ids = userIds.filter(Boolean);
+  if (ids.length === 0) return {};
+  try {
+    const url = authApiUrl(
+      `/users/profiles?user_ids=${encodeURIComponent(ids.join(","))}`
+    );
+    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    if (!res.ok) return {};
+    const json = (await res.json()) as {
+      data?: { profiles?: UserProfileBrief[] };
+    };
+    const list = json.data?.profiles ?? [];
+    return Object.fromEntries(list.map((p) => [p.user_id, p]));
+  } catch (err) {
+    console.error("[getProfilesBatch] 异常:", err);
+    return {};
+  }
+}
+
 /**
  * 搜索用户（邀请成员，昵称/用户ID 模糊匹配；防枚举：关键词 ≥2 字符、上限 20 条）。
  * 关键词过短由后端 400，这里直接返回空数组避免无谓请求。
