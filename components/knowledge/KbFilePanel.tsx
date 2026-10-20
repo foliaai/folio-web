@@ -602,21 +602,6 @@ export const KbFilePanel = ({
           >
             {kb.knowledge_base_name}
           </span>
-          {kb.visibility === "team" ? (
-            <span
-              className="shrink-0 rounded bg-primary/10 px-1 py-px text-[10px] leading-4 font-normal text-primary"
-              title="共享知识库：通过「成员管理」邀请的成员共同读写"
-            >
-              共享
-            </span>
-          ) : kb.visibility === "public" ? (
-            <span
-              className="shrink-0 rounded bg-amber-50 px-1 py-px text-[10px] leading-4 font-normal text-amber-600"
-              title="订阅知识库：所有登录用户可读"
-            >
-              订阅
-            </span>
-          ) : null}
         </div>
         {/* 统计行对齐库名起点（px-3 + 图标 16 + gap 8 = 36px） */}
         <div className="flex items-center gap-1.5 pl-9 text-[11px] text-muted-subtle">

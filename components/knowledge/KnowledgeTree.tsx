@@ -172,21 +172,6 @@ export const KnowledgeTree = ({
             >
               {kb.knowledge_base_name}
             </span>
-            {kb.visibility === "team" ? (
-              <span
-                className="shrink-0 rounded bg-primary/10 px-1 py-px text-[10px] leading-4 text-primary"
-                title="共享知识库：通过「成员管理」邀请的成员共同读写"
-              >
-                共享
-              </span>
-            ) : kb.visibility === "public" ? (
-              <span
-                className="shrink-0 rounded bg-amber-50 px-1 py-px text-[10px] leading-4 text-amber-600"
-                title="订阅知识库：所有登录用户可读"
-              >
-                订阅
-              </span>
-            ) : null}
           </button>
 
           {/* 窄面板里只留数字徽标，把宽度让给知识库名；问答目标行常驻按钮，徽标让位 */}
