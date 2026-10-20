@@ -8,6 +8,7 @@ import {
   getAuthSession,
   setAuthSession,
 } from "@/lib/auth";
+import { handleAuthExpired, isTokenExpired } from "@/lib/auth-expired";
 import { getAuthProvider } from "@/lib/auth-providers";
 
 interface AuthContextValue {
@@ -35,6 +36,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(storedSession?.accessToken ?? null);
     setUser(storedSession?.user ?? null);
     setIsReady(true);
+  }, []);
+
+  // 凭证自然过期主动检测：页面加载时 token 早已过期、或页面静默挂着过期，
+  // 这两种情况可能没有 API 请求去触发 401 拦截（lib/api/http.ts）
+  useEffect(() => {
+    const check = () => {
+      const stored = getAuthSession();
+      if (stored?.accessToken && isTokenExpired(stored.accessToken)) {
+        handleAuthExpired();
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const value = useMemo<AuthContextValue>(

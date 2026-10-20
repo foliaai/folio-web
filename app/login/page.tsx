@@ -88,13 +88,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nextPath, setNextPath] = useState("/");
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
-    const next =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("next") || "/"
-        : "/";
-    setNextPath(next);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setNextPath(params.get("next") || "/");
+    // 凭证过期被全局拦截（lib/auth-expired.ts）送回本页时带 expired=1
+    setExpired(params.get("expired") === "1");
   }, []);
 
   useEffect(() => {
@@ -179,6 +180,11 @@ export default function LoginPage() {
           <div className="mt-10 border-t border-hairline" />
 
           <div className="mt-10 space-y-4">
+            {expired && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                登录已过期，请重新登录
+              </div>
+            )}
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}

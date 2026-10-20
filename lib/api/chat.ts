@@ -7,6 +7,7 @@
  * 后端契约见：docs/特殊功能设计/知识库对话设计.md §4 / §5
  */
 
+import { authFetch } from "@/lib/api/http";
 import { API_CONFIG, getChatWsUrl, getCommonHeaders } from "@/lib/config";
 import type { ApiResponse } from "@/lib/knowledge-types";
 import type {
@@ -45,7 +46,7 @@ function buildHeaders(init?: RequestInit): HeadersInit {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildChatUrl(path), {
+  const response = await authFetch(buildChatUrl(path), {
     ...init,
     headers: buildHeaders(init),
   });

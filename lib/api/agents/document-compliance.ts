@@ -4,6 +4,7 @@
  */
 
 import { DocumentCheckResponse, CheckRule, CheckField, MeetingRecord } from "@/lib/types";
+import { authFetch } from "@/lib/api/http";
 import { API_CONFIG, getCommonHeaders, getCurrentUserId } from "@/lib/config";
 
 // ========== 类型映射 ==========
@@ -79,7 +80,7 @@ function fromBackendRule(backendRule: BackendRuleConfig): CheckRule {
  */
 export async function fetchUserCheckRules(): Promise<CheckRule[]> {
   try {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/config/rules?enabled_only=false`,
       {
         method: "GET",
@@ -112,7 +113,7 @@ export async function createCheckRule(rule: Omit<CheckRule, "id">): Promise<Chec
   try {
     const backendRuleData = toBackendRule({ ...rule, id: "" } as CheckRule);
     
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/config/rules`,
       {
         method: "POST",
@@ -145,7 +146,7 @@ export async function updateCheckRule(rule: CheckRule): Promise<CheckRule> {
   try {
     const backendRuleData = toBackendRule(rule);
     
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/config/rules/${rule.id}`,
       {
         method: "PUT",
@@ -175,7 +176,7 @@ export async function updateCheckRule(rule: CheckRule): Promise<CheckRule> {
  */
 export async function deleteCheckRule(ruleId: string): Promise<void> {
   try {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/config/rules/${ruleId}`,
       {
         method: "DELETE",
@@ -221,7 +222,7 @@ async function uploadFileToStorage(file: File, sessionId?: string): Promise<stri
     const headers = getCommonHeaders();
     delete headers["Content-Type"];
 
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/common/storage/upload`,
       {
         method: "POST",
@@ -259,7 +260,7 @@ export async function checkDocument(
     const fileId = await uploadFileToStorage(params.files[0], params.session_id);
 
     // 2. 调用检查接口
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/check`,
       {
         method: "POST",
@@ -306,7 +307,7 @@ export async function exportPrompt(
   templateName: string = "default"
 ): Promise<string> {
   try {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.VERSION}/apps/document-compliance/export-prompt`,
       {
         method: "POST",

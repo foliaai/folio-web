@@ -7,6 +7,7 @@
  * 随 createTeam 的 member_user_ids 带入（创建即快照）。
  */
 
+import { authFetch } from "@/lib/api/http";
 import { API_CONFIG, getCommonHeaders } from "@/lib/config";
 import type { ApiResponse } from "@/lib/knowledge-types";
 
@@ -25,7 +26,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(buildTeamUrl(path), { ...init, headers });
+  const response = await authFetch(buildTeamUrl(path), { ...init, headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({
       detail: "团队接口请求失败",
