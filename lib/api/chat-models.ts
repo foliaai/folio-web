@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { authFetch } from "@/lib/api/http";
 import { API_CONFIG, getCommonHeaders } from "@/lib/config";
 import type { ApiResponse } from "@/lib/knowledge-types";
 
@@ -64,7 +65,7 @@ function buildUrl(path: string): string {
 export async function fetchChatModels(
   signal?: AbortSignal,
 ): Promise<ChatModelItem[]> {
-  const response = await fetch(buildUrl("/api/chat/models"), {
+  const response = await authFetch(buildUrl("/api/chat/models"), {
     method: "GET",
     headers: buildHeaders(),
     signal,

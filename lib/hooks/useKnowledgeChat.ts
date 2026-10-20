@@ -26,6 +26,8 @@ import {
   summarizeChatContext,
   fetchContextStatus,
 } from "@/lib/api/chat";
+import { getAuthToken } from "@/lib/auth";
+import { handleAuthExpired, isTokenExpired } from "@/lib/auth-expired";
 import {
   getSettingsDefaultModel,
   getSettingsEnableRoutePlan,
@@ -1096,6 +1098,11 @@ export function useKnowledgeChat(
       },
       onClose: () => {
         wsRef.current = null;
+        // 凭证已过期的断连：重连无意义，走全局过期跳转（HTTP 401 拦截的 WS 侧补充）
+        if (isTokenExpired(getAuthToken())) {
+          handleAuthExpired();
+          return;
+        }
         // 进行中的轮没收到 turn.done → 标记为中断
         setMessages((prev) =>
           prev.map((m) =>

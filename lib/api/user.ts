@@ -5,6 +5,7 @@
  * 头像上传/删除暂仍走 AKS（依赖 MinIO 存储服务，待其迁入 auth-server 后切换）。
  */
 
+import { authFetch } from "@/lib/api/http";
 import { authApiUrl, getCommonHeaders } from "@/lib/config";
 
 /** 所属组织条目（auth-server organization 表，扁平无层级） */
@@ -65,7 +66,7 @@ export async function getOrgMembers(
     const url = authApiUrl(
       `/orgs/${encodeURIComponent(departmentId)}/members`
     );
-    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    const res = await authFetch(url, { method: "GET", headers: getCommonHeaders() });
     if (!res.ok) return null;
     const json = { code: 0, message: "", ...(await res.json()) } as {
       data?: OrgMembersData;
@@ -96,7 +97,7 @@ export async function getProfilesBatch(
     const url = authApiUrl(
       `/users/profiles?user_ids=${encodeURIComponent(ids.join(","))}`
     );
-    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    const res = await authFetch(url, { method: "GET", headers: getCommonHeaders() });
     if (!res.ok) return {};
     const json = (await res.json()) as {
       data?: { profiles?: UserProfileBrief[] };
@@ -120,7 +121,7 @@ export async function searchUsers(q: string): Promise<UserSearchItem[]> {
     const url = authApiUrl(
       `/users/search?q=${encodeURIComponent(keyword)}&limit=20`
     );
-    const res = await fetch(url, { method: "GET", headers: getCommonHeaders() });
+    const res = await authFetch(url, { method: "GET", headers: getCommonHeaders() });
     if (!res.ok) return [];
     const json = (await res.json()) as { data?: { users?: UserSearchItem[] } };
     return json.data?.users ?? [];
@@ -155,7 +156,7 @@ export async function getUserProfile(): Promise<UserProfileData | null> {
     const url = authApiUrl("/user/profile");
     const headers = getCommonHeaders();
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "GET",
       headers,
     });
@@ -184,7 +185,7 @@ export async function updateUserProfile(payload: {
   const url = authApiUrl("/user/profile");
   const headers = getCommonHeaders();
 
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "PUT",
     headers,
     body: JSON.stringify(payload),
@@ -216,7 +217,7 @@ export async function uploadUserAvatar(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "POST",
     headers,
     body: formData,
