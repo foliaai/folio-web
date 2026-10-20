@@ -257,17 +257,22 @@ function KnowledgeGuestView() {
 // 双击分割条清除自定义值，回到默认比例。
 const SPLIT_RATIO_STORAGE_KEY = "knowledge-workspace-left-ratio";
 /**
- * 管理区现在是两栏（知识库列表 + 文件管理），默认占屏约 2/5，
- * 保证文件栏在常见 1440/1920 屏上有 320~480px 的可用宽度。
+ * 管理区现在是两栏（知识库列表 + 文件管理），默认占屏约 3/10，
+ * 保证文件栏在常见 1440/1920 屏上有 300~380px 的可用宽度。
  */
-const SPLIT_RATIO_DEFAULT = 0.38;
-const SPLIT_MIN = 520;
+const SPLIT_RATIO_DEFAULT = 0.3;
+/**
+ * 宽度下限：保文件管理列 ~236px 可用（库列表 224 固定）。不取更高是刻意的——
+ * 固定像素下限在 1280~1733 的窗口里会把管理区钉死，缩放视口时宽度不跟随、
+ * 占比越缩越大；宁可窄窗口里文件列紧一点（可折叠库列表列腾出 112px）。
+ */
+const SPLIT_MIN = 460;
 const SPLIT_MAX = 900;
 /** 默认宽度封顶：比例在大屏上过宽，超过即压住，多出的宽度留给对话区 */
-const SPLIT_DEFAULT_MAX = 700;
+const SPLIT_DEFAULT_MAX = 600;
 /** SSR / 首帧拿不到 window.innerWidth 时的兜底宽度 */
 const SPLIT_FALLBACK_WIDTH = 640;
-/** 库列表列宽（w-56）；折叠时管理块总宽减去其一半（右线左移 112px） */
+/** 库列表列宽（w-56）；收起时管理块总宽减去其全宽（224px 全部还给对话区） */
 const LIST_COLUMN_WIDTH = 224;
 /** 当前选中的知识库 ID 持久化 key（刷新后保持在原知识库，而非跳回第一个） */
 const SELECTED_KB_STORAGE_KEY = "knowledge-workspace-selected-kb";
@@ -424,7 +429,7 @@ function KnowledgeWorkspace() {
     );
   }, []);
 
-  /** 左侧宽度：默认占屏 1/4 并封顶，用户拖过之后按其比例（上限放宽） */
+  /** 左侧宽度：默认占屏约 3/10 并封顶，用户拖过之后按其比例（上限放宽） */
   const effectiveLeftWidth = useMemo(() => {
     const vw = viewportWidth || 0;
     if (!vw) return SPLIT_FALLBACK_WIDTH;
@@ -1116,11 +1121,11 @@ function KnowledgeWorkspace() {
         className="flex h-[calc(100dvh-3.5rem)] md:h-screen w-full bg-white xl:grid xl:grid-cols-[var(--knowledge-left-width)_6px_minmax(0,1fr)]"
         style={
           {
-            // 折叠后列表列整体让位、不留导轨：右缘分割线左移列表列宽的一半
-            // （112px），另一半空间留给文件区加宽，剩余给对话区
+            // 收起后列表列的宽度整体让位、不留导轨：224px 全部还给对话区，
+            // 文件管理列宽度与展开时保持一致（收起是为了腾空间，不是为了加宽文件区）
             "--knowledge-left-width": `${
               leftCollapsed
-                ? effectiveLeftWidth - LIST_COLUMN_WIDTH / 2
+                ? effectiveLeftWidth - LIST_COLUMN_WIDTH
                 : effectiveLeftWidth
             }px`,
           } as React.CSSProperties
