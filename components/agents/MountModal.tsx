@@ -33,7 +33,8 @@ export const MountModal = ({ isOpen, onClose, onConfirm }: MountModalProps) => {
       try {
         setIsLoading(true);
         setError(null);
-        const nextKnowledgeBases = await fetchKnowledgeBases();
+        const { knowledgeBases: nextKnowledgeBases } =
+          await fetchKnowledgeBases();
         setKnowledgeBases(nextKnowledgeBases);
 
         const foldersByKb = await Promise.all(
