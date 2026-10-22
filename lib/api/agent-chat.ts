@@ -3,14 +3,15 @@
  *
  * - WS  ：openAgentStream(...) —— agent-server /api/v1/chat/ws
  *          （连接/心跳/中断封装模式同 lib/api/chat.ts 的 openChatStream，
- *            独立实现避免动 AKS 链路；URL 经 getChatWsUrl 注入 token）
+ *            独立实现避免动 AKS 链路；URL 经 getAgentWsUrl 注入 token，
+ *            基址可被 NEXT_PUBLIC_AGENT_API_URL 独立覆盖——JP 无网关直连用）
  * - REST：useAgentModels()    —— GET /api/v1/models（模型选择器数据源）
  */
 
 import { useEffect, useRef, useState } from "react";
 
 import { authFetch } from "@/lib/api/http";
-import { API_CONFIG, getChatWsUrl, getCommonHeaders } from "@/lib/config";
+import { getAgentApiBase, getAgentWsUrl, getCommonHeaders } from "@/lib/config";
 import type {
   AgentClientFrame,
   AgentMessageItem,
@@ -51,7 +52,7 @@ export function openAgentStream(handlers: AgentStreamHandlers) {
     throw new Error("openAgentStream 只能在浏览器环境调用");
   }
 
-  const url = getChatWsUrl("/api/v1/chat/ws");
+  const url = getAgentWsUrl();
   const ws = new WebSocket(url);
   let pingTimer: number | null = null;
   let closedByUs = false;
@@ -115,7 +116,7 @@ export async function fetchAgentModels(): Promise<AgentModelItem[]> {
   const next: Record<string, string> = {};
   if (headers.Authorization) next.Authorization = headers.Authorization;
 
-  const resp = await authFetch(`${API_CONFIG.BASE_URL}/api/v1/models`, {
+  const resp = await authFetch(`${getAgentApiBase()}/api/v1/models`, {
     headers: next,
   });
   if (!resp.ok) {
@@ -170,7 +171,7 @@ async function sessionsFetch(path: string, init?: RequestInit): Promise<Response
   const next: Record<string, string> = { "Content-Type": headers["Content-Type"] };
   if (headers.Authorization) next.Authorization = headers.Authorization;
   if (init?.body) next["Content-Type"] = "application/json";
-  return authFetch(`${API_CONFIG.BASE_URL}/api/v1/sessions${path}`, {
+  return authFetch(`${getAgentApiBase()}/api/v1/sessions${path}`, {
     ...init,
     headers: next,
   });
@@ -215,7 +216,7 @@ async function filesFetch(path: string, init?: RequestInit): Promise<Response> {
   if (extra) {
     for (const [k, v] of Object.entries(extra)) next[k] = v;
   }
-  return authFetch(`${API_CONFIG.BASE_URL}${path}`, { ...init, headers: next });
+  return authFetch(`${getAgentApiBase()}${path}`, { ...init, headers: next });
 }
 
 /**
