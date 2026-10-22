@@ -19,6 +19,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { fetchChunkPosition } from "@/lib/api/knowledge";
 import type { ElementPosition } from "@/lib/knowledge-types";
+import { MarkdownFileView } from "@/components/knowledge/MarkdownFileView";
 
 // PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -57,6 +58,10 @@ export const DocumentView = ({
 }: DocumentViewProps) => {
   // PDF 原生文件，以及 Word/PPT（后端 /raw 默认返回转换 PDF）
   const isPdf = isPdfPreviewableFile(file);
+  const isMarkdown = (() => {
+    const name = (file.file_name || "").toLowerCase();
+    return name.endsWith(".md") || name.endsWith(".markdown");
+  })();
   const isOfficeConvertedPreview = (() => {
     const name = file.file_name.toLowerCase();
     return (
@@ -186,6 +191,17 @@ export const DocumentView = ({
     },
     []
   );
+
+  // Markdown：拉 /raw 原文走 react-markdown 渲染（无 bbox，不做 chunk 高亮）
+  if (isMarkdown && previewUrl) {
+    return (
+      <MarkdownFileView
+        fileName={file.file_name}
+        fileSize={file.file_size}
+        previewUrl={previewUrl}
+      />
+    );
+  }
 
   if (!isPdf) {
     return (
