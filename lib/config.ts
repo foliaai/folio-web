@@ -60,6 +60,22 @@ export function getQueryAuthToken(): string {
 }
 
 /**
+ * 把 http(s) 基址转成 ws(s)（WebSocket 构造要求），并去掉尾部斜杠。
+ */
+function toWebSocketUrl(baseUrl: string): string {
+  let wsUrl = baseUrl;
+  if (wsUrl.startsWith("https://")) {
+    wsUrl = "wss://" + wsUrl.slice("https://".length);
+  } else if (wsUrl.startsWith("http://")) {
+    wsUrl = "ws://" + wsUrl.slice("http://".length);
+  } else if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
+    wsUrl = `ws://${wsUrl}`;
+  }
+
+  return wsUrl.replace(/\/+$/, "");
+}
+
+/**
  * 推导知识库对话 WebSocket 的连接 URL。
  *
  * 规则：
@@ -83,20 +99,38 @@ export function getChatWsUrl(path: string = "/api/chat/ws"): string {
     baseUrl = "http://localhost:8000";
   }
 
-  let wsUrl = baseUrl;
-  if (wsUrl.startsWith("https://")) {
-    wsUrl = "wss://" + wsUrl.slice("https://".length);
-  } else if (wsUrl.startsWith("http://")) {
-    wsUrl = "ws://" + wsUrl.slice("http://".length);
-  } else if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
-    wsUrl = `ws://${wsUrl}`;
-  }
-
-  wsUrl = wsUrl.replace(/\/+$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   const separator = normalizedPath.includes("?") ? "&" : "?";
-  return `${wsUrl}${normalizedPath}${separator}token=${encodeURIComponent(token)}`;
+  return `${toWebSocketUrl(baseUrl)}${normalizedPath}${separator}token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * agent-server API 基址（首页智能体对话区专用，REST 与 WS 共用）。
+ *
+ * - 有网关的部署（本地 Caddy / prd nginx 按 /api/v1/* 分发到 agent-server）
+ *   不设此变量，与 AKS 共用 API_CONFIG.BASE_URL 即可；
+ * - JP 无网关、浏览器直连后端时设 NEXT_PUBLIC_AGENT_API_URL
+ *   （如 http://192.168.19.12:8002），agent 的 REST/WS 独立指向 agent-server。
+ */
+export function getAgentApiBase(): string {
+  const explicit = process.env.NEXT_PUBLIC_AGENT_API_URL;
+  if (explicit && explicit.trim().length > 0) {
+    return explicit.trim().replace(/\/+$/, "");
+  }
+  return (API_CONFIG.BASE_URL || "").replace(/\/+$/, "");
+}
+
+/**
+ * agent-server 对话 WebSocket URL（默认 /api/v1/chat/ws；token 走 query，
+ * 与知识库对话同一鉴权通道）。
+ */
+export function getAgentWsUrl(path: string = "/api/v1/chat/ws"): string {
+  const token = getQueryAuthToken();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  const separator = normalizedPath.includes("?") ? "&" : "?";
+  return `${toWebSocketUrl(getAgentApiBase())}${normalizedPath}${separator}token=${encodeURIComponent(token)}`;
 }
 
 /**

@@ -119,3 +119,181 @@
 .markdown-body tbody tr:nth-child(even) {
   background-color: rgb(250 251 251);
 }
+
+/* ==================== agent markdown（agent 对话正文 + 工作区解析文本） ====================
+   项目未装 @tailwindcss/typography，preflight 会把标题压成正文同字号、列表去
+   项目符号、表格无线框——.agent-md 容器手动补齐文档观感（标题层级放大、
+   GFM 管道表与 MinerU 内嵌 HTML 表通用表格样式）。 */
+.agent-md h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.75rem;
+}
+.agent-md h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 1.25rem 0 0.6rem;
+}
+.agent-md h3 {
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+.agent-md h4,
+.agent-md h5,
+.agent-md h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.85rem 0 0.4rem;
+}
+.agent-md h1:first-child,
+.agent-md h2:first-child,
+.agent-md h3:first-child {
+  margin-top: 0;
+}
+.agent-md p {
+  margin: 0.5rem 0;
+}
+.agent-md ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+.agent-md ol {
+  list-style: decimal;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+.agent-md li {
+  margin: 0.2rem 0;
+}
+.agent-md li > p {
+  margin: 0;
+}
+.agent-md blockquote {
+  border-left: 3px solid #d1d9d6; /* hairline 加深一档 */
+  padding-left: 0.9rem;
+  color: #5f6f6a;
+  margin: 0.6rem 0;
+}
+.agent-md hr {
+  border-color: #dfe7e4; /* hairline */
+  margin: 1.2rem 0;
+}
+.agent-md a {
+  color: #007a49; /* primary-deep，白底 5.41:1 */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* 表格样式与 .markdown-body 同款 */
+.agent-md table {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.875em;
+  line-height: 1.6;
+}
+.agent-md thead {
+  background-color: rgb(249 250 251); /* gray-50 */
+}
+.agent-md th,
+.agent-md td {
+  border: 1px solid #dfe7e4; /* hairline */
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.agent-md th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.agent-md tbody tr:nth-child(even) {
+  background-color: rgb(250 251 251);
+}
+/* MinerU 的内嵌表格没有 thead（整表 tbody>tr>td），首行按表头呈现；
+   GFM 管道表有 thead，:has(thead) 排除避免误伤其首个数据行 */
+.agent-md table:not(:has(thead)) tbody tr:first-child td {
+  background-color: rgb(249 250 251); /* gray-50 */
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* 表格/图片的题注与脚注（后端 mark_caption_footnotes 打的语义标签）：
+   与正文明确区分——题注居中小字灰，脚注更小且上方虚线隔开 */
+.agent-md p.md-caption {
+  text-align: center;
+  font-size: 0.8em;
+  color: #5f6f6a;
+  margin: 0.35rem 0 0.85rem;
+}
+.agent-md p.md-footnote {
+  font-size: 0.75em;
+  color: #7c8a85;
+  margin: 0.3rem 0 0.9rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed #d1d9d6;
+}
+
+/* ==================== 代码块浅色语法高亮 ==================== */
+/* GitHub-light 基调(浅底深字),饱和度收敛与 folio 浅绿主题协调;
+   token class 由 rehype-prism-plus 生成,壳样式见 CodeBlock 组件 */
+.codeblock-light .token.comment,
+.codeblock-light .token.prolog,
+.codeblock-light .token.cdata {
+  color: #6e7781;
+  font-style: italic;
+}
+.codeblock-light .token.doctype,
+.codeblock-light .token.punctuation {
+  color: #4b5563;
+}
+.codeblock-light .token.property,
+.codeblock-light .token.tag,
+.codeblock-light .token.constant,
+.codeblock-light .token.symbol,
+.codeblock-light .token.deleted {
+  color: #953800;
+}
+.codeblock-light .token.boolean,
+.codeblock-light .token.number {
+  color: #0550ae;
+}
+.codeblock-light .token.selector,
+.codeblock-light .token.attr-name,
+.codeblock-light .token.string,
+.codeblock-light .token.char,
+.codeblock-light .token.builtin,
+.codeblock-light .token.inserted {
+  color: #0a6b3d;
+}
+.codeblock-light .token.operator,
+.codeblock-light .token.entity,
+.codeblock-light .token.url {
+  color: #0550ae;
+}
+.codeblock-light .token.atrule,
+.codeblock-light .token.attr-value,
+.codeblock-light .token.keyword {
+  color: #cf222e;
+}
+.codeblock-light .token.function,
+.codeblock-light .token.class-name {
+  color: #8250df;
+}
+.codeblock-light .token.regex,
+.codeblock-light .token.important,
+.codeblock-light .token.variable {
+  color: #953800;
+}
+.codeblock-light .token.decorator,
+.codeblock-light .token.decorator.punctuation {
+  color: #8250df;
+}
+/* 无语言标注的普通代码块文字色(兜底) */
+.codeblock-light code[class*="language-"] {
+  color: inherit;
+}

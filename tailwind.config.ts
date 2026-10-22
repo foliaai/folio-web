@@ -66,11 +66,16 @@ const config: Config = {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
         },
+        slideInRight: {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
       },
       animation: {
         fadeIn: "fadeIn 0.3s ease-out",
         slideUp: "slideUp 0.3s ease-out",
         slideIn: "slideIn 0.3s ease-out",
+        slideInRight: "slideInRight 0.25s ease-out",
       },
     },
   },
