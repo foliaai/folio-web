@@ -102,6 +102,12 @@ export interface ElementPosition {
   /** 元素所在页码（从 0 开始）；文本 chunk 可能跨页，需逐元素渲染高亮 */
   page_index?: number | null;
   page_position?: number[] | null;
+  /**
+   * 该元素在文档内全部同类型元素中的序号（0 起）。
+   * 无 bbox 的解析来源（markdown/html）用它做序号锚定：
+   * 前端数渲染结果里第 N 个 table/pre/img 定位高亮。
+   */
+  type_ordinal?: number | null;
 }
 
 /** MinerU pipeline bbox 坐标空间：各轴 0~coord_range，左上角原点 */

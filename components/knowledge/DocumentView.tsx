@@ -19,6 +19,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { fetchChunkPosition } from "@/lib/api/knowledge";
 import type { ElementPosition } from "@/lib/knowledge-types";
+import { HtmlFileView } from "@/components/knowledge/HtmlFileView";
 import { MarkdownFileView } from "@/components/knowledge/MarkdownFileView";
 
 // PDF.js worker
@@ -61,6 +62,10 @@ export const DocumentView = ({
   const isMarkdown = (() => {
     const name = (file.file_name || "").toLowerCase();
     return name.endsWith(".md") || name.endsWith(".markdown");
+  })();
+  const isHtml = (() => {
+    const name = (file.file_name || "").toLowerCase();
+    return name.endsWith(".html") || name.endsWith(".htm");
   })();
   const isOfficeConvertedPreview = (() => {
     const name = file.file_name.toLowerCase();
@@ -192,10 +197,31 @@ export const DocumentView = ({
     []
   );
 
-  // Markdown：拉 /raw 原文走 react-markdown 渲染（无 bbox，不做 chunk 高亮）
+  // Markdown：拉 /raw 原文走 react-markdown 渲染。
+  // 无 bbox 坐标，chunk 定位高亮走「同类型元素序号」锚定（MarkdownFileView 内实现）
   if (isMarkdown && previewUrl) {
     return (
       <MarkdownFileView
+        fileName={file.file_name}
+        fileSize={file.file_size}
+        previewUrl={previewUrl}
+        highlight={
+          highlight
+            ? {
+                chunkId: highlightChunkId ?? null,
+                chunkType: highlight.chunkType,
+                elements: highlight.elements,
+              }
+            : null
+        }
+      />
+    );
+  }
+
+  // HTML：拉 /raw 原文走 iframe sandbox 渲染（原样式布局保留，脚本全禁）
+  if (isHtml && previewUrl) {
+    return (
+      <HtmlFileView
         fileName={file.file_name}
         fileSize={file.file_size}
         previewUrl={previewUrl}
