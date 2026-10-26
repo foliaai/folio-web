@@ -13,6 +13,8 @@ const customIconMap: Record<string, string> = {
   csv: `${ICON_DIR}/excel.png`,
   md: `${ICON_DIR}/md.png`,
   markdown: `${ICON_DIR}/md.png`,
+  html: `${ICON_DIR}/html.png`,
+  htm: `${ICON_DIR}/html.png`,
   txt: `${ICON_DIR}/txt.png`,
   png: `${ICON_DIR}/image.png`,
   jpg: `${ICON_DIR}/image.png`,

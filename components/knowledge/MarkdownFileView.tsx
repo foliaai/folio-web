@@ -5,6 +5,14 @@
  *
  * 复用 chat 同套渲染（react-markdown + GFM + remark-math + KaTeX），
  * 原文经后端 /raw 端点拉取。窄屏：内容单列、表格横向滚动。
+ *
+ * chunk 定位高亮：md 元素无 bbox 坐标，无法按坐标画框；position 接口对每个
+ * 关联元素返回 type_ordinal（文档内同类型序号）。渲染出的顶层块与解析器
+ * 元素流同构（同源码、同顺序），按标签分桶计数即可锚定：text→p/h/ul/ol/
+ * blockquote、table→table、image→仅含图段落、code→pre。chunk 的全部关联
+ * 块都框选（与 PDF 逐元素画框同口径），首块滚动居中。
+ * 已知错位边缘：图片下载失败回退段（text 元素渲染成图段）、html_block
+ * 罕见产物——序号漂移 clamp 兜底，最多框到相邻块。
  */
 
 import remarkGfm from "remark-gfm";
@@ -12,23 +20,105 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { AlertCircle, FileText, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import type { ElementPosition } from "@/lib/knowledge-types";
 import { formatBytes } from "@/lib/utils";
+
+interface MarkdownHighlight {
+  chunkId: string | null;
+  chunkType: string;
+  elements: ElementPosition[];
+}
 
 interface MarkdownFileViewProps {
   fileName: string;
   fileSize?: number | null;
   previewUrl: string;
+  highlight?: MarkdownHighlight | null;
 }
+
+/** 元素类型 → 序号锚桶（桶内序号与后端元素流的同类型序号同构） */
+const ELEMENT_BUCKET: Record<string, string> = {
+  text: "text",
+  table: "table",
+  image: "image",
+  code_block: "code",
+};
+
+/** 渲染顶层块 → 桶分类；null = 不参与序号锚定的块（hr / KaTeX 块等） */
+function classifyRenderedBlock(el: Element): string | null {
+  const tag = el.tagName.toLowerCase();
+  if (tag === "table") return "table";
+  if (tag === "pre") return "code";
+  if (tag === "img") return "image";
+  if (tag === "p") {
+    // 仅含图片、无文本的段落是图片元素的渲染形态；其余段落算文本块
+    if (el.querySelector("img") && !(el.textContent || "").trim()) {
+      return "image";
+    }
+    return "text";
+  }
+  if (/^h[1-6]$/.test(tag) || tag === "ul" || tag === "ol" || tag === "blockquote") {
+    return "text";
+  }
+  return null;
+}
+
+const HIGHLIGHT_CLASS = "md-chunk-highlight";
+const HIGHLIGHT_CLEAR_MS = 3200;
 
 export function MarkdownFileView({
   fileName,
   fileSize,
   previewUrl,
+  highlight,
 }: MarkdownFileViewProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const articleRef = useRef<HTMLDivElement>(null);
+
+  // 序号锚定：按桶数渲染顶层块，chunk 的每个关联元素各自定位到
+  // 桶内第 N 块；全部高亮（与 PDF 逐元素画框同口径），首块滚动居中
+  useEffect(() => {
+    if (!content || !highlight) return;
+    const container = articleRef.current;
+    if (!container) return;
+
+    const buckets: Record<string, Element[]> = {
+      text: [],
+      table: [],
+      image: [],
+      code: [],
+    };
+    for (const child of Array.from(container.children)) {
+      const bucket = classifyRenderedBlock(child);
+      if (bucket) buckets[bucket].push(child);
+    }
+
+    const targets: HTMLElement[] = [];
+    for (const e of highlight.elements) {
+      const bucket = ELEMENT_BUCKET[e.element_type];
+      if (!bucket || typeof e.type_ordinal !== "number") continue;
+      const list = buckets[bucket];
+      if (list.length === 0) continue;
+      const node = list[Math.min(e.type_ordinal, list.length - 1)];
+      if (node instanceof HTMLElement && !targets.includes(node)) {
+        targets.push(node);
+      }
+    }
+    if (targets.length === 0) return;
+
+    targets[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    for (const t of targets) t.classList.add(HIGHLIGHT_CLASS);
+    const timer = setTimeout(() => {
+      for (const t of targets) t.classList.remove(HIGHLIGHT_CLASS);
+    }, HIGHLIGHT_CLEAR_MS);
+    return () => {
+      clearTimeout(timer);
+      for (const t of targets) t.classList.remove(HIGHLIGHT_CLASS);
+    };
+  }, [content, highlight]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +170,10 @@ export function MarkdownFileView({
           <article className="mx-auto w-full max-w-3xl bg-white px-4 py-6 shadow-sm md:px-10 md:py-10">
             {/* agent-md：globals.css 手写文档样式（项目未装 typography 插件，
                 prose 类不生效），与 agent 工作区渲染观感一致 */}
-            <div className="agent-md text-[15px] leading-relaxed text-gray-800">
+            <div
+              ref={articleRef}
+              className="agent-md text-[15px] leading-relaxed text-gray-800"
+            >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
