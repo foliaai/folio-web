@@ -232,6 +232,10 @@ export function CitationPreviewBody({
     );
 
   if (table) {
+    // 表体两种形态：MinerU 系存 HTML（<table>/<tr> 标签）走 innerHTML；
+    // markdown 系存 GFM 管道原文（| 引脚 | …），须走 remark-gfm 渲染，
+    // 注入 innerHTML 只会得到裸文本管道
+    const isHtmlTable = /<(table|tr|td|th)\b/i.test(table.bodyHtml);
     return (
       <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2 text-left">
         {table.caption ? (
@@ -247,10 +251,17 @@ export function CitationPreviewBody({
             "[&_td]:border [&_td]:border-gray-200 [&_td]:px-1.5 [&_td]:py-1",
             "[&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:px-1.5 [&_th]:py-1"
           )}
-          dangerouslySetInnerHTML={{
-            __html: sanitizeCitationHtml(table.bodyHtml),
-          }}
-        />
+        >
+          {isHtmlTable ? (
+            <div
+              dangerouslySetInnerHTML={{
+                __html: sanitizeCitationHtml(table.bodyHtml),
+              }}
+            />
+          ) : (
+            <CitationPreviewMarkdown content={table.bodyHtml} />
+          )}
+        </div>
         {table.footnote ? (
           <div className="shrink-0 rounded-md bg-gray-50 px-2 py-1.5 text-[10px] text-gray-600">
             <CitationPreviewMarkdown content={table.footnote} />

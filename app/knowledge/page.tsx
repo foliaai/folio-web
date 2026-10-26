@@ -1252,7 +1252,7 @@ function KnowledgeWorkspace() {
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.markdown,.json,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.markdown,.html,.htm,.json,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"
           className="hidden"
           onChange={handleFileSelect}
         />

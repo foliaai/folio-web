@@ -124,6 +124,24 @@
    项目未装 @tailwindcss/typography，preflight 会把标题压成正文同字号、列表去
    项目符号、表格无线框——.agent-md 容器手动补齐文档观感（标题层级放大、
    GFM 管道表与 MinerU 内嵌 HTML 表通用表格样式）。 */
+/* md 预览 chunk 定位高亮（引用溯源点击跳转：序号锚定到第 N 个 table/pre/img） */
+.agent-md .md-chunk-highlight {
+  outline: 2px solid #f59e0b;
+  outline-offset: 3px;
+  border-radius: 4px;
+  animation: md-chunk-flash 3s ease-out forwards;
+}
+@keyframes md-chunk-flash {
+  0%,
+  55% {
+    outline-color: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+  }
+  100% {
+    outline-color: transparent;
+    box-shadow: none;
+  }
+}
 .agent-md h1 {
   font-size: 1.5rem;
   font-weight: 700;
