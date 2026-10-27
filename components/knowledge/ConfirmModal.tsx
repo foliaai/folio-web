@@ -21,6 +21,15 @@ export type ConfirmAction =
       confirmLabel: string;
       dangerNote?: string;
       onConfirm: () => Promise<void>;
+    }
+  | {
+      /** 常规确认（非破坏性，如转让负责人），主色按钮 */
+      kind: "default";
+      title: string;
+      description: string;
+      confirmLabel: string;
+      dangerNote?: string;
+      onConfirm: () => Promise<void>;
     };
 
 export function ConfirmModal({
@@ -53,13 +62,20 @@ export function ConfirmModal({
   const canConfirm = requiresTypedConfirm
     ? input.trim() === action.confirmText
     : true;
+  const isDanger = action.kind !== "default";
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+            <div
+              className={
+                isDanger
+                  ? "flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-500"
+                  : "flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+              }
+            >
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
@@ -109,7 +125,11 @@ export function ConfirmModal({
             type="button"
             disabled={!canConfirm || busy}
             onClick={() => void action.onConfirm()}
-            className="flex h-9 items-center justify-center rounded-full bg-red-500 px-5 text-sm font-medium text-white shadow-sm transition-all hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-red-500/40 disabled:shadow-none"
+            className={
+              isDanger
+                ? "flex h-9 items-center justify-center rounded-full bg-red-500 px-5 text-sm font-medium text-white shadow-sm transition-all hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-red-500/40 disabled:shadow-none"
+                : "flex h-9 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+            }
           >
             {busy ? "处理中..." : action.confirmLabel}
           </button>

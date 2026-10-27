@@ -5,6 +5,7 @@ import {
   ApiResponse,
   ChunkImagePreviewResponse,
   ChunkPositionResponse,
+  ExcelContentResponse,
   FileIndexStatus,
   FilePreviewResponse,
   FileProgress,
@@ -516,6 +517,16 @@ export async function fetchFilePreview(
   const suffix = expires ? `?expires=${expires}` : "";
   return requestJson<FilePreviewResponse>(
     `/api/knowledge/file/${encodeURIComponent(fileId)}/preview${suffix}`,
+    { method: "GET" }
+  );
+}
+
+/** Excel 文件内容视图（元素流：工作表分组 + 表格/图片卡片） */
+export async function fetchExcelContent(
+  fileId: string
+): Promise<ExcelContentResponse> {
+  return requestJson<ExcelContentResponse>(
+    `/api/knowledge/file/${encodeURIComponent(fileId)}/excel-content`,
     { method: "GET" }
   );
 }

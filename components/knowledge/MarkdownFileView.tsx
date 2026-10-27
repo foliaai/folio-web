@@ -23,7 +23,14 @@ import ReactMarkdown from "react-markdown";
 import { useEffect, useRef, useState } from "react";
 
 import type { ElementPosition } from "@/lib/knowledge-types";
+import { FileUploaderMeta } from "@/components/knowledge/FileUploaderMeta";
 import { formatBytes } from "@/lib/utils";
+import {
+  MermaidBlock,
+  isMermaidCode,
+  isMermaidPre,
+  mermaidCodeText,
+} from "@/components/ui/MermaidBlock";
 
 interface MarkdownHighlight {
   chunkId: string | null;
@@ -34,6 +41,9 @@ interface MarkdownHighlight {
 interface MarkdownFileViewProps {
   fileName: string;
   fileSize?: number | null;
+  /** 上传者用户ID + 上传时间（头部元信息；缺席不渲染） */
+  uploadedBy?: string | null;
+  uploadedAt?: string | null;
   previewUrl: string;
   highlight?: MarkdownHighlight | null;
 }
@@ -71,6 +81,8 @@ const HIGHLIGHT_CLEAR_MS = 3200;
 export function MarkdownFileView({
   fileName,
   fileSize,
+  uploadedBy,
+  uploadedAt,
   previewUrl,
   highlight,
 }: MarkdownFileViewProps) {
@@ -152,6 +164,7 @@ export function MarkdownFileView({
             {formatBytes(fileSize)}
           </span>
         ) : null}
+        <FileUploaderMeta userId={uploadedBy} createdAt={uploadedAt} />
         <span className="ml-auto shrink-0 text-xs text-muted">Markdown</span>
       </div>
 
@@ -178,18 +191,24 @@ export function MarkdownFileView({
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
                 components={{
-                  pre: ({ children }) => (
-                    <pre className="overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-inherit">
-                      {children}
-                    </pre>
-                  ),
-                  code: ({ className, children }) => (
-                    <code
-                      className={`rounded-sm bg-primary/10 px-1.5 py-0.5 font-mono text-[13px] text-primary-deep ${className || ""}`}
-                    >
-                      {children}
-                    </code>
-                  ),
+                  pre: ({ children }) =>
+                    isMermaidPre(children) ? (
+                      <>{children}</>
+                    ) : (
+                      <pre className="overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-inherit">
+                        {children}
+                      </pre>
+                    ),
+                  code: ({ className, children }) =>
+                    isMermaidCode(className) ? (
+                      <MermaidBlock code={mermaidCodeText(children)} />
+                    ) : (
+                      <code
+                        className={`rounded-sm bg-primary/10 px-1.5 py-0.5 font-mono text-[13px] text-primary-deep ${className || ""}`}
+                      >
+                        {children}
+                      </code>
+                    ),
                   img: ({ src, alt }) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
