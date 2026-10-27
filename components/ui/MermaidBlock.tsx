@@ -3,25 +3,64 @@
 /**
  * MermaidBlock - mermaid 代码块渲染（flowchart/sequence/gantt 等）
  *
- * 动态 import mermaid（~2MB，不进首屏 bundle），strict 安全模式
- * （SVG 净化，<br/> 等白名单标签可用），语法错误降级为原始代码块。
- * 各 markdown 渲染入口的 code 组件用 isMermaidCode 拦截后改走本组件。
+ * mermaid 以 UMD 单文件形态放 public/vendor/（scripts/copy-mermaid.mjs 从
+ * node_modules 拷贝，postinstall 自动执行），运行时动态 script 标签加载
+ * window.mermaid——**不进 bundler**：直接 import 会让 Turbopack 构建内存
+ * 峰值暴涨，CI runner OOM（进程被 Killed）。
+ *
+ * strict 安全模式（SVG 净化，<br/> 等白名单标签可用），语法错误降级为
+ * 原始代码块。各 markdown 渲染入口的 code 组件用 isMermaidCode 拦截后
+ * 改走本组件。
  */
 
 import { Loader2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-let mermaidPromise: Promise<typeof import("mermaid")> | null = null;
+/** mermaid default export 的实例类型（纯类型引用，不产生运行时导入） */
+type Mermaid = typeof import("mermaid")["default"];
 
-function loadMermaid() {
+declare global {
+  interface Window {
+    mermaid?: Mermaid;
+  }
+}
+
+const MERMAID_SRC = "/vendor/mermaid.min.js";
+let mermaidPromise: Promise<Mermaid> | null = null;
+
+function loadMermaid(): Promise<Mermaid> {
   if (!mermaidPromise) {
-    mermaidPromise = import("mermaid").then((m) => {
-      m.default.initialize({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: "neutral",
-      });
-      return m;
+    mermaidPromise = new Promise<Mermaid>((resolve, reject) => {
+      const existing = window.document.querySelector<HTMLScriptElement>(
+        `script[src="${MERMAID_SRC}"]`
+      );
+      const script = existing ?? window.document.createElement("script");
+      const onload = () => {
+        const m = window.mermaid;
+        if (!m) {
+          reject(new Error("mermaid.min.js 加载后 window.mermaid 缺失"));
+          return;
+        }
+        m.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "neutral",
+        });
+        resolve(m);
+      };
+      script.addEventListener("load", onload, { once: true });
+      script.addEventListener(
+        "error",
+        () => reject(new Error(`mermaid.min.js 加载失败: ${MERMAID_SRC}`)),
+        { once: true }
+      );
+      if (!existing) {
+        script.src = MERMAID_SRC;
+        window.document.head.appendChild(script);
+      }
+    });
+    mermaidPromise.catch(() => {
+      mermaidPromise = null; // 失败后允许重试
     });
   }
   return mermaidPromise;
@@ -62,12 +101,12 @@ export function MermaidBlock({ code }: { code: string }) {
     setSvg(null);
     setFailed(false);
     loadMermaid()
-      .then((m) => m.default.render(domId, code))
+      .then((m) => m.render(domId, code))
       .then(({ svg: out }) => {
         if (!cancelled) setSvg(out);
       })
       .catch(() => {
-        // 语法错误/渲染失败：降级显示原始代码，不让整页崩
+        // 语法错误/脚本加载失败：降级显示原始代码，不让整页崩
         if (!cancelled) setFailed(true);
       });
     return () => {

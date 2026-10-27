@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:tokens": "node scripts/check-tokens.mjs"
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "postinstall": "node scripts/copy-mermaid.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
