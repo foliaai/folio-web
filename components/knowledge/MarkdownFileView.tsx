@@ -23,6 +23,7 @@ import ReactMarkdown from "react-markdown";
 import { useEffect, useRef, useState } from "react";
 
 import type { ElementPosition } from "@/lib/knowledge-types";
+import { FileUploaderMeta } from "@/components/knowledge/FileUploaderMeta";
 import { formatBytes } from "@/lib/utils";
 import {
   MermaidBlock,
@@ -40,6 +41,9 @@ interface MarkdownHighlight {
 interface MarkdownFileViewProps {
   fileName: string;
   fileSize?: number | null;
+  /** 上传者用户ID + 上传时间（头部元信息；缺席不渲染） */
+  uploadedBy?: string | null;
+  uploadedAt?: string | null;
   previewUrl: string;
   highlight?: MarkdownHighlight | null;
 }
@@ -77,6 +81,8 @@ const HIGHLIGHT_CLEAR_MS = 3200;
 export function MarkdownFileView({
   fileName,
   fileSize,
+  uploadedBy,
+  uploadedAt,
   previewUrl,
   highlight,
 }: MarkdownFileViewProps) {
@@ -158,6 +164,7 @@ export function MarkdownFileView({
             {formatBytes(fileSize)}
           </span>
         ) : null}
+        <FileUploaderMeta userId={uploadedBy} createdAt={uploadedAt} />
         <span className="ml-auto shrink-0 text-xs text-muted">Markdown</span>
       </div>
 

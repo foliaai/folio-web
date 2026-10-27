@@ -5,6 +5,7 @@ import {
   addTeamMembers,
   fetchTeamDetail,
   removeTeamMember,
+  transferTeamOwner,
   updateTeamMemberRole,
   type TeamDetail,
 } from "@/lib/api/team";
@@ -19,6 +20,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
 import {
   Check,
+  Crown,
   Loader2,
   Search,
   ShieldCheck,
@@ -31,14 +33,14 @@ import {
  * 共享知识库的成员管理面板（"团队"是纯后端授权实现，UI 不出现该概念，D12）。
  *
  * 交互：
- * - 任何成员可查看名单；创建者/管理员可邀请与移除（管理员移管理员需创建者）
- * - 创建者可设/撤「管理员」
+ * - 任何成员可查看名单；负责人/管理员可邀请与移除（管理员移管理员需负责人）
+ * - 负责人可设/撤「管理员」、转让负责人（转让后自己降为管理员）
  * - JP 快速邀请：主部门未入队成员一键加入（数据驱动：无 departments 不出现）
  * - 成员组随库创建、删库自动回收——面板内没有解散/改名等团队级操作
  */
 
 const ROLE_LABEL: Record<string, string> = {
-  owner: "创建者",
+  owner: "负责人",
   admin: "管理员",
   member: "成员",
 };
@@ -230,6 +232,22 @@ export function TeamMembersDialog({
     }
   };
 
+  /** 转让负责人：确认后调用，原负责人（自己）降为管理员 */
+  const handleTransferOwner = (userId: string, displayName: string) => {
+    if (!detail) return;
+    setConfirm({
+      kind: "default",
+      title: "转让负责人",
+      description: `确定将知识库「${kbName}」的负责人转让给 ${displayName}？转让后对方可管理成员与角色，你将变为管理员。`,
+      confirmLabel: "转让",
+      onConfirm: async () => {
+        await transferTeamOwner(detail.team_id, userId);
+        notify(`负责人已转让给：${displayName}`);
+        await load();
+      },
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[1100] flex items-end justify-center bg-black/30 px-4 pb-4 backdrop-blur-sm sm:items-center sm:pb-0">
       <div
@@ -278,7 +296,7 @@ export function TeamMembersDialog({
             </p>
           ) : (
             <>
-              {/* 邀请区（创建者/管理员） */}
+              {/* 邀请区（负责人/管理员） */}
               {isManager ? (
                 <div className="space-y-2.5">
                   <div className="relative">
@@ -404,6 +422,20 @@ export function TeamMembersDialog({
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-gray-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleTransferOwner(
+                                member.user_id,
+                                profile?.display_name ?? member.user_id
+                              )
+                            }
+                            title="转让负责人（自己降为管理员）"
+                            aria-label={`转让负责人给 ${profile?.display_name ?? member.user_id}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-gray-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
+                          >
+                            <Crown className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"

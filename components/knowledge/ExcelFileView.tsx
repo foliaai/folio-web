@@ -23,6 +23,7 @@ import type {
 } from "@/lib/knowledge-types";
 import { formatBytes } from "@/lib/utils";
 import { sanitizeCitationHtml } from "@/components/knowledge/citationPreviewUtils";
+import { FileUploaderMeta } from "@/components/knowledge/FileUploaderMeta";
 
 interface ExcelHighlight {
   chunkId: string | null;
@@ -116,6 +117,7 @@ export function ExcelFileView({ file, highlight }: ExcelFileViewProps) {
             {formatBytes(file.file_size)}
           </span>
         ) : null}
+        <FileUploaderMeta userId={file.user_id} createdAt={file.create_time} />
         <span className="ml-auto shrink-0 text-xs text-muted">
           Excel · {data ? `${data.total_sheets} 个工作表` : ""}
         </span>

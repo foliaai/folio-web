@@ -59,7 +59,7 @@ interface KnowledgeMetric {
 
 function buildMetrics(files: KnowledgeFile[]): KnowledgeMetric {
   const latest = files
-    .map((file) => file.updated_at)
+    .map((file) => file.updated_at ?? file.create_time)
     .filter((value): value is string => Boolean(value))
     .sort()
     .at(-1);

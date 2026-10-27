@@ -45,6 +45,10 @@ export interface FileInfo {
   status?: number | null;
   knowledge_base_id?: string;
   description?: string | null;
+  /** 上传者用户ID（共享库内即上传成员，个人库为库主人） */
+  user_id?: string | null;
+  /** 上传时间（ISO 格式） */
+  create_time?: string | null;
 }
 
 export type FileIndexStatus = "pending" | "processing" | "success" | "failed";
