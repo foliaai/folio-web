@@ -142,6 +142,24 @@
     box-shadow: none;
   }
 }
+
+/* excel 预览 chunk 定位高亮（卡片即元素，按 element_id 直配框选） */
+.excel-card.excel-card-highlight {
+  outline: 2px solid #f59e0b;
+  outline-offset: 3px;
+  animation: excel-card-flash 3s ease-out forwards;
+}
+@keyframes excel-card-flash {
+  0%,
+  55% {
+    outline-color: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+  }
+  100% {
+    outline-color: transparent;
+    box-shadow: none;
+  }
+}
 .agent-md h1 {
   font-size: 1.5rem;
   font-weight: 700;

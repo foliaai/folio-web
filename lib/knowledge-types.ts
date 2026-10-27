@@ -123,3 +123,27 @@ export interface ChunkPositionResponse {
   coord_range?: number | null;
   elements: ElementPosition[];
 }
+
+/** Excel 内容视图：卡片元素（卡片即元素，框选按 element_id 匹配） */
+export interface ExcelCardElement {
+  element_id: string;
+  type: "table" | "image" | "text" | string;
+  text?: string | null;
+  caption?: string | null;
+  footnote?: string | null;
+  table_body?: string | null;
+  image_url?: string | null;
+}
+
+export interface ExcelSheetView {
+  page_index: number;
+  title: string;
+  elements: ExcelCardElement[];
+}
+
+export interface ExcelContentResponse {
+  file_id: string;
+  file_name: string;
+  total_sheets: number;
+  sheets: ExcelSheetView[];
+}

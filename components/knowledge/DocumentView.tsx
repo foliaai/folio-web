@@ -20,6 +20,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { fetchChunkPosition } from "@/lib/api/knowledge";
 import type { ElementPosition } from "@/lib/knowledge-types";
 import { HtmlFileView } from "@/components/knowledge/HtmlFileView";
+import { ExcelFileView } from "@/components/knowledge/ExcelFileView";
 import { MarkdownFileView } from "@/components/knowledge/MarkdownFileView";
 
 // PDF.js worker
@@ -66,6 +67,10 @@ export const DocumentView = ({
   const isHtml = (() => {
     const name = (file.file_name || "").toLowerCase();
     return name.endsWith(".html") || name.endsWith(".htm");
+  })();
+  const isExcel = (() => {
+    const name = (file.file_name || "").toLowerCase();
+    return name.endsWith(".xlsx") || name.endsWith(".xls");
   })();
   const isOfficeConvertedPreview = (() => {
     const name = file.file_name.toLowerCase();
@@ -205,6 +210,24 @@ export const DocumentView = ({
         fileName={file.file_name}
         fileSize={file.file_size}
         previewUrl={previewUrl}
+        highlight={
+          highlight
+            ? {
+                chunkId: highlightChunkId ?? null,
+                chunkType: highlight.chunkType,
+                elements: highlight.elements,
+              }
+            : null
+        }
+      />
+    );
+  }
+
+  // Excel：元素流驱动视图（excel-content 端点，卡片=元素，按 element_id 框选）
+  if (isExcel) {
+    return (
+      <ExcelFileView
+        file={file}
         highlight={
           highlight
             ? {
