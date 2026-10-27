@@ -10,6 +10,7 @@
  */
 
 import { KnowledgeFile } from "@/lib/knowledge-types";
+import { FileUploaderMeta } from "@/components/knowledge/FileUploaderMeta";
 import { isPdfPreviewableFile } from "@/lib/knowledge-viewer";
 import { formatBytes } from "@/lib/utils";
 import { AlertCircle, FileText, Loader2 } from "lucide-react";
@@ -20,6 +21,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { fetchChunkPosition } from "@/lib/api/knowledge";
 import type { ElementPosition } from "@/lib/knowledge-types";
 import { HtmlFileView } from "@/components/knowledge/HtmlFileView";
+import { ExcelFileView } from "@/components/knowledge/ExcelFileView";
 import { MarkdownFileView } from "@/components/knowledge/MarkdownFileView";
 
 // PDF.js worker
@@ -66,6 +68,10 @@ export const DocumentView = ({
   const isHtml = (() => {
     const name = (file.file_name || "").toLowerCase();
     return name.endsWith(".html") || name.endsWith(".htm");
+  })();
+  const isExcel = (() => {
+    const name = (file.file_name || "").toLowerCase();
+    return name.endsWith(".xlsx") || name.endsWith(".xls");
   })();
   const isOfficeConvertedPreview = (() => {
     const name = file.file_name.toLowerCase();
@@ -204,7 +210,27 @@ export const DocumentView = ({
       <MarkdownFileView
         fileName={file.file_name}
         fileSize={file.file_size}
+        uploadedBy={file.user_id}
+        uploadedAt={file.create_time}
         previewUrl={previewUrl}
+        highlight={
+          highlight
+            ? {
+                chunkId: highlightChunkId ?? null,
+                chunkType: highlight.chunkType,
+                elements: highlight.elements,
+              }
+            : null
+        }
+      />
+    );
+  }
+
+  // Excel：元素流驱动视图（excel-content 端点，卡片=元素，按 element_id 框选）
+  if (isExcel) {
+    return (
+      <ExcelFileView
+        file={file}
         highlight={
           highlight
             ? {
@@ -224,6 +250,8 @@ export const DocumentView = ({
       <HtmlFileView
         fileName={file.file_name}
         fileSize={file.file_size}
+        uploadedBy={file.user_id}
+        uploadedAt={file.create_time}
         previewUrl={previewUrl}
       />
     );
@@ -236,6 +264,7 @@ export const DocumentView = ({
           <FileText className="h-4 w-4 shrink-0 text-muted" />
           <span className="truncate text-sm text-foreground">{file.file_name}</span>
           <span className="text-xs text-muted">{formatBytes(file.file_size)}</span>
+          <FileUploaderMeta userId={file.user_id} createdAt={file.create_time} />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center p-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-muted">
@@ -257,6 +286,7 @@ export const DocumentView = ({
         <FileText className="h-4 w-4 shrink-0 text-muted" />
         <span className="truncate text-sm text-foreground">{file.file_name}</span>
         <span className="text-xs text-muted">{formatBytes(file.file_size)}</span>
+        <FileUploaderMeta userId={file.user_id} createdAt={file.create_time} />
         {numPages > 0 ? (
           <span className="text-xs text-muted">共 {numPages} 页</span>
         ) : null}

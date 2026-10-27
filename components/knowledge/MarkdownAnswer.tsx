@@ -29,6 +29,12 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CitationChip } from "@/components/knowledge/CitationChip";
+import {
+  MermaidBlock,
+  isMermaidCode,
+  isMermaidPre,
+  mermaidCodeText,
+} from "@/components/ui/MermaidBlock";
 import type { Citation } from "@/lib/chat-types";
 
 // 匹配 `[cN]`（c + 1-6 位纯数字）
@@ -188,6 +194,15 @@ export function MarkdownAnswer({
       h4: makeTransform("h4"),
       h5: makeTransform("h5"),
       h6: makeTransform("h6"),
+      // code/pre 不参与引用替换（代码里的 [cN] 不应被换），仅拦截 mermaid
+      code: ({ className, children }: { className?: string; children?: ReactNode }) =>
+        isMermaidCode(className) ? (
+          <MermaidBlock code={mermaidCodeText(children)} />
+        ) : (
+          <code className={className}>{children}</code>
+        ),
+      pre: ({ children }: { children?: ReactNode }) =>
+        isMermaidPre(children) ? <>{children}</> : <pre>{children}</pre>,
     } as Record<string, React.ComponentType<Record<string, unknown>>>;
   }, [lookup, warnedUnknown]);
 

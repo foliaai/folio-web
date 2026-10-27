@@ -45,6 +45,10 @@ export interface FileInfo {
   status?: number | null;
   knowledge_base_id?: string;
   description?: string | null;
+  /** 上传者用户ID（共享库内即上传成员，个人库为库主人） */
+  user_id?: string | null;
+  /** 上传时间（ISO 格式） */
+  create_time?: string | null;
 }
 
 export type FileIndexStatus = "pending" | "processing" | "success" | "failed";
@@ -122,4 +126,28 @@ export interface ChunkPositionResponse {
   /** 归一化坐标轴最大值，默认 1000 */
   coord_range?: number | null;
   elements: ElementPosition[];
+}
+
+/** Excel 内容视图：卡片元素（卡片即元素，框选按 element_id 匹配） */
+export interface ExcelCardElement {
+  element_id: string;
+  type: "table" | "image" | "text" | string;
+  text?: string | null;
+  caption?: string | null;
+  footnote?: string | null;
+  table_body?: string | null;
+  image_url?: string | null;
+}
+
+export interface ExcelSheetView {
+  page_index: number;
+  title: string;
+  elements: ExcelCardElement[];
+}
+
+export interface ExcelContentResponse {
+  file_id: string;
+  file_name: string;
+  total_sheets: number;
+  sheets: ExcelSheetView[];
 }

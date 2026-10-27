@@ -16,14 +16,24 @@ import { AlertCircle, FileCode2, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { formatBytes } from "@/lib/utils";
+import { FileUploaderMeta } from "@/components/knowledge/FileUploaderMeta";
 
 interface HtmlFileViewProps {
   fileName: string;
   fileSize?: number | null;
+  /** 上传者用户ID + 上传时间（头部元信息；缺席不渲染） */
+  uploadedBy?: string | null;
+  uploadedAt?: string | null;
   previewUrl: string;
 }
 
-export function HtmlFileView({ fileName, fileSize, previewUrl }: HtmlFileViewProps) {
+export function HtmlFileView({
+  fileName,
+  fileSize,
+  uploadedBy,
+  uploadedAt,
+  previewUrl,
+}: HtmlFileViewProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +67,7 @@ export function HtmlFileView({ fileName, fileSize, previewUrl }: HtmlFileViewPro
         {fileSize ? (
           <span className="shrink-0 text-xs text-muted">{formatBytes(fileSize)}</span>
         ) : null}
+        <FileUploaderMeta userId={uploadedBy} createdAt={uploadedAt} />
         <span className="ml-auto shrink-0 text-xs text-muted">HTML · 沙箱预览</span>
       </div>
 

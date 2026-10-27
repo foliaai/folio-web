@@ -41,7 +41,7 @@ export interface TeamInfo {
   team_id: string;
   name: string;
   description?: string | null;
-  /** 当前用户在团队中的角色：owner=创建者 / member=成员 */
+  /** 当前用户在团队中的角色：owner=负责人 / admin=管理员 / member=成员 */
   my_role: string;
   member_count: number;
   create_time?: string | null;
@@ -132,4 +132,18 @@ export async function updateTeamMemberRole(
     `/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/role`,
     { method: "PUT", body: JSON.stringify({ role }) }
   );
+}
+
+/**
+ * 转让负责人给现有成员（原负责人降为管理员）。
+ * 平台管理员可强转兜底离职死档（API 侧放行，前端入口仅负责人可见）。
+ */
+export async function transferTeamOwner(
+  teamId: string,
+  userId: string
+): Promise<void> {
+  await requestJson<null>(`/${encodeURIComponent(teamId)}/owner`, {
+    method: "PUT",
+    body: JSON.stringify({ user_id: userId }),
+  });
 }

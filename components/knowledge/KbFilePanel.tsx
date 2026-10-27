@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderInfo, KnowledgeFile } from "@/lib/knowledge-types";
 import { cn, formatBytes } from "@/lib/utils";
+import { useProfileMap } from "@/lib/useProfileMap";
 import {
   ChevronDown,
   ChevronRight,
@@ -109,6 +110,18 @@ export const KbFilePanel = ({
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // 上传者显示名（树行 tooltip 用；进程缓存，跨视图不重复请求）
+  const uploaderIds = useMemo(
+    () =>
+      Array.from(
+        new Set(files.map((f) => f.user_id).filter((id): id is string => Boolean(id)))
+      ),
+    [files]
+  );
+  const uploaderProfiles = useProfileMap(uploaderIds);
+  // 共享库（team/public）文件来自多成员，行内标注上传者；个人库恒为自己，不标
+  const showUploader = kb?.visibility === "team" || kb?.visibility === "public";
 
   const kbId = kb?.knowledge_base_id ?? "";
 
@@ -359,16 +372,28 @@ export const KbFilePanel = ({
         onDragStart={() => setDraggingFileId(file.file_id)}
         onDragEnd={() => setDraggingFileId(null)}
         className={cn(
-          "group flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-gray-100 hover:text-foreground",
+          "group relative flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-gray-100 hover:text-foreground",
           isDraggable && "cursor-grab active:cursor-grabbing",
           draggingFileId === file.file_id && "opacity-40"
         )}
         style={{ paddingLeft: indentOf(depth) }}
       >
         <FileIcon fileName={file.file_name} className="h-5 w-5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate" title={file.file_name}>
-          {file.file_name}
-        </span>
+        {/* 上传者/大小/时间走下方 hover 浮层展示；不挂原生 title（黑框与浮层重复） */}
+        <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
+
+        {/* hover 浮出：上传者/大小/上传时间（常驻只显示大小；不挡操作按钮） */}
+        <div className="pointer-events-none absolute right-2 top-[calc(100%-4px)] z-20 hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-muted shadow-md group-hover:flex">
+          {showUploader && file.user_id ? (
+            <span className="max-w-[6rem] truncate font-medium text-foreground">
+              {uploaderProfiles[file.user_id]?.display_name ?? file.user_id} 上传
+            </span>
+          ) : null}
+          <span>{formatBytes(file.file_size)}</span>
+          {file.create_time ? (
+            <span>{file.create_time.replace("T", " ").slice(0, 16)}</span>
+          ) : null}
+        </div>
 
         {isProcessing || isFailed ? (
           <span
