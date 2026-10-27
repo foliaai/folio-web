@@ -12,6 +12,12 @@ import { cn } from "@/lib/utils";
 import type { SkillDetail as SkillDetailType } from "@/lib/api/skills";
 import { resolveSkillCoverUrl } from "@/lib/api/skills";
 import { SkillCover } from "@/components/skills/SkillCover";
+import {
+  MermaidBlock,
+  isMermaidCode,
+  isMermaidPre,
+  mermaidCodeText,
+} from "@/components/ui/MermaidBlock";
 
 type BodyView = "preview" | "source";
 
@@ -278,6 +284,9 @@ function SkillMarkdown({ content }: { content: string }) {
             </a>
           ),
           code: ({ className, children }) => {
+            if (isMermaidCode(className)) {
+              return <MermaidBlock code={mermaidCodeText(children)} />;
+            }
             const isBlock = Boolean(className) || String(children).includes("\n");
             if (isBlock) {
               return (
@@ -292,11 +301,14 @@ function SkillMarkdown({ content }: { content: string }) {
               </code>
             );
           },
-          pre: ({ children }) => (
-            <pre className="my-3 overflow-x-auto rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200">
-              {children}
-            </pre>
-          ),
+          pre: ({ children }) =>
+            isMermaidPre(children) ? (
+              <>{children}</>
+            ) : (
+              <pre className="my-3 overflow-x-auto rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200">
+                {children}
+              </pre>
+            ),
           table: ({ children }) => (
             <div className="my-3 overflow-x-auto">
               <table className="w-full border-collapse text-left text-xs">{children}</table>

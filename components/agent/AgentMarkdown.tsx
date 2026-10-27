@@ -21,6 +21,12 @@ import rehypeKatex from "rehype-katex";
 import rehypePrism from "rehype-prism-plus";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import {
+  MermaidBlock,
+  isMermaidCode,
+  isMermaidPre,
+  mermaidCodeText,
+} from "@/components/ui/MermaidBlock";
 
 import { CodeBlockPre, InlineCode } from "@/components/agent/CodeBlock";
 
@@ -123,7 +129,12 @@ export function AgentMarkdown({
 }) {
   const components = useMemo(
     () => ({
-      pre: ({ children }: { children?: ReactNode }) => <CodeBlockPre>{children}</CodeBlockPre>,
+      pre: ({ children }: { children?: ReactNode }) =>
+        isMermaidPre(children) ? (
+          <>{children}</>
+        ) : (
+          <CodeBlockPre>{children}</CodeBlockPre>
+        ),
       code: ({
         className,
         children,
@@ -131,11 +142,15 @@ export function AgentMarkdown({
         className?: string;
         children?: ReactNode;
       }) => {
+        // mermaid 围栏改走 MermaidBlock（pre 壳已脱）。
         // 块级 code(有无语言标注)由 pre 壳渲染,原样透传保住 prism class;
         // 行内 code 套浅绿胶囊。区分依据是 className:rehype-prism-plus 对所有
         // pre>code 都会加 class(language-xxx 和/或 code-highlight),行内 code
         // 则永远没有 class —— 若按 language- 判断,无语言围栏会误入行内胶囊,
         // 展开态正文多出 6px 内边距且字号缩到 0.85em,与折叠预览错位。
+        if (isMermaidCode(className)) {
+          return <MermaidBlock code={mermaidCodeText(children)} />;
+        }
         if (className) {
           return <code className={className}>{children}</code>;
         }

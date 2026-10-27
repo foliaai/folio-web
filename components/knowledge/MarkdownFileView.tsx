@@ -24,6 +24,12 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ElementPosition } from "@/lib/knowledge-types";
 import { formatBytes } from "@/lib/utils";
+import {
+  MermaidBlock,
+  isMermaidCode,
+  isMermaidPre,
+  mermaidCodeText,
+} from "@/components/ui/MermaidBlock";
 
 interface MarkdownHighlight {
   chunkId: string | null;
@@ -178,18 +184,24 @@ export function MarkdownFileView({
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
                 components={{
-                  pre: ({ children }) => (
-                    <pre className="overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-inherit">
-                      {children}
-                    </pre>
-                  ),
-                  code: ({ className, children }) => (
-                    <code
-                      className={`rounded-sm bg-primary/10 px-1.5 py-0.5 font-mono text-[13px] text-primary-deep ${className || ""}`}
-                    >
-                      {children}
-                    </code>
-                  ),
+                  pre: ({ children }) =>
+                    isMermaidPre(children) ? (
+                      <>{children}</>
+                    ) : (
+                      <pre className="overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-inherit">
+                        {children}
+                      </pre>
+                    ),
+                  code: ({ className, children }) =>
+                    isMermaidCode(className) ? (
+                      <MermaidBlock code={mermaidCodeText(children)} />
+                    ) : (
+                      <code
+                        className={`rounded-sm bg-primary/10 px-1.5 py-0.5 font-mono text-[13px] text-primary-deep ${className || ""}`}
+                      >
+                        {children}
+                      </code>
+                    ),
                   img: ({ src, alt }) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
