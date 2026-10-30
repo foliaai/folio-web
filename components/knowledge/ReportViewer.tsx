@@ -7,25 +7,26 @@
  * 支持下载 HTML 文件和全屏查看。
  *
  * 引用链接重写：报告里的 `<a class="citation" href="#ref-cN">` 原本是页内锚点
- * （跳到参考文献区）。这里根据传入的 citations 把它重写为 PDF 预览页地址
- * `/knowledge/file/{fileId}?chunkId={chunkId}&type={type}`，点击后在新标签打开
- * 原文档并定位高亮——与对话里的 CitationChip 行为一致。
+ * （跳到参考文献区）。这里根据传入的 citations 把它重写为预览标记 hash
+ * `#folio-preview:{fileId}:{chunkId}`，点击后经 postMessage 通知外层在
+ * 当前页内打开预览覆盖层——与对话里的 CitationChip 行为一致。
  */
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { X, Download, Maximize2 } from "lucide-react";
 import type { Citation } from "@/lib/chat-types";
+import { openFilePreview, parsePreviewMessage } from "@/lib/file-preview";
 
 interface ReportViewerProps {
   /** HTML 字符串内容 */
   htmlContent: string;
-  /** 报告所属消息的 citations，用于把 [cN] 锚点重写为 PDF 预览页链接 */
+  /** 报告所属消息的 citations，用于把 [cN] 锚点重写为页内预览链接 */
   citations?: Citation[];
   /** 关闭回调 */
   onClose: () => void;
 }
 
-/** 构建 alias(cN) → PDF 预览页 URL 的查表 */
+/** 构建 alias(cN) → 预览标记 hash 的查表（iframe 拦截脚本识别后 postMessage 外层） */
 function buildCitationUrlMap(
   citations: Citation[] | undefined
 ): Map<string, string> {
@@ -35,14 +36,8 @@ function buildCitationUrlMap(
     // alias 优先（如 "c7"）；没有 alias 时回退到序号 c{i+1}
     const key = (c.alias ?? `c${i + 1}`).toLowerCase();
     if (!c.file_id) return;
-    const params = new URLSearchParams();
-    if (c.chunk_id) params.set("chunkId", c.chunk_id);
-    if (c.chunk_type) params.set("type", c.chunk_type);
-    const qs = params.toString();
-    map.set(
-      key,
-      `/knowledge/file/${encodeURIComponent(c.file_id)}${qs ? "?" + qs : ""}`
-    );
+    const parts = [c.file_id, c.chunk_id ?? ""];
+    map.set(key, `#folio-preview:${parts.join(":")}`);
   });
   return map;
 }
@@ -52,29 +47,23 @@ export function ReportViewer({ htmlContent, citations, onClose }: ReportViewerPr
 
   const citationUrlMap = useMemo(() => buildCitationUrlMap(citations), [citations]);
 
-  // 1) 重写引用锚点为 PDF 预览页 URL（并加 target="_blank"）；
+  // 1) 重写引用锚点为预览标记 hash；
   // 2) 注入点击拦截脚本：页内 hash 锚点（#section-N 等）改用 scrollIntoView，
   //    避免在 opaque-origin iframe 内触发导航卡在"检查登录状态"；
-  //    非页内链接（如重写后的引用）交给浏览器 window.open 在新标签打开。
+  //    #folio-preview: 前缀经 postMessage 送外层页内打开；其余外链交给浏览器新标签。
   const safeSrcDoc = useMemo(() => {
     if (!htmlContent) return htmlContent;
 
     let doc = htmlContent;
 
-    // 重写 <a class="citation" href="#ref-cN"> → PDF 预览页（完整 <a> 标签）
+    // 重写 <a class="citation" href="#ref-cN"> → 预览标记 hash
     if (citationUrlMap.size > 0) {
       doc = doc.replace(
         /<a([^>]*?)class="([^"]*\bcitation\b[^"]*)"([^>]*?)href="#ref-(c\d+)"([^>]*)>/gi,
         (whole, pre: string, cls: string, mid: string, alias: string, post: string) => {
           const url = citationUrlMap.get(alias.toLowerCase());
           if (!url) return whole;
-          let attrs = `${pre}class="${cls}"${mid}href="${url}"${post}`;
-          if (/target=/i.test(attrs)) {
-            attrs = attrs.replace(/target="[^"]*"/i, 'target="_blank"');
-          } else {
-            attrs = `${attrs} target="_blank"`;
-          }
-          return `<a${attrs}>`;
+          return `<a${pre}class="${cls}"${mid}href="${url}"${post}>`;
         }
       );
     }
@@ -89,6 +78,14 @@ export function ReportViewer({ htmlContent, citations, onClose }: ReportViewerPr
     var hash = '';
     var hashIdx = href.indexOf('#');
     if (hashIdx >= 0) hash = href.slice(hashIdx + 1);
+    if (hash.indexOf('folio-preview:') === 0) {
+      e.preventDefault();
+      var payload = hash.slice('folio-preview:'.length).split(':');
+      try {
+        window.parent.postMessage({ fileId: payload[0] || '', chunkId: payload[1] || null }, '*');
+      } catch (_) {}
+      return;
+    }
     if (hash) {
       var el = document.getElementById(hash);
       if (el) {
@@ -123,6 +120,16 @@ export function ReportViewer({ htmlContent, citations, onClose }: ReportViewerPr
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // iframe（opaque origin）里点引用 → postMessage 转发为页内预览事件
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      const req = parsePreviewMessage(e.data);
+      if (req) openFilePreview(req);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   // 下载 HTML 文件（下载原始报告，不含重写后的链接）
   const handleDownload = useCallback(() => {

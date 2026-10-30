@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AgentChatPanel } from "@/components/agent/AgentChatPanel";
+import { FilePreviewHost } from "@/components/knowledge/FilePreviewHost";
 
 /**
  * / — 首页：通用智能体入口
@@ -27,5 +28,11 @@ export default function HomePage() {
     return <div className="min-h-screen bg-dark" />;
   }
 
-  return <AgentChatPanel />;
+  return (
+    <>
+      <AgentChatPanel />
+      {/* 页内文件预览宿主：对话里的引用点击在当前页打开预览 */}
+      <FilePreviewHost />
+    </>
+  );
 }
