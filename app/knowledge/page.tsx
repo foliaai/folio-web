@@ -14,6 +14,7 @@ import {
   fetchKnowledgeBaseChildren,
   fetchKnowledgeBases,
   moveFile,
+  moveFolder,
   uploadKnowledgeFiles,
 } from "@/lib/api/knowledge";
 import { CreateKbDialog } from "@/components/knowledge/CreateKbDialog";
@@ -25,13 +26,14 @@ import {
 import { KnowledgeChatPanel } from "@/components/knowledge/KnowledgeChatPanel";
 import { KnowledgeTree } from "@/components/knowledge/KnowledgeTree";
 import { KbFilePanel } from "@/components/knowledge/KbFilePanel";
+import { FilePreviewHost } from "@/components/knowledge/FilePreviewHost";
+import { openFilePreview } from "@/lib/file-preview";
 import { useUploadTasks } from "@/components/knowledge/UploadTasksProvider";
 import {
   FolderInfo,
   KnowledgeBaseInfo,
   KnowledgeFile,
 } from "@/lib/knowledge-types";
-import { cacheKnowledgeFileView } from "@/lib/knowledge-viewer";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -731,9 +733,16 @@ function KnowledgeWorkspace() {
   // 拖拽期间监听全局 mousemove / mouseup；同步给 body 加 col-resize 光标 + 禁选中。
   useEffect(() => {
     if (!dragging) return;
+    // 折叠态库列表列（LIST_COLUMN_WIDTH）整体让位：分割条视觉位置是
+    // effectiveLeftWidth - 224。若直接拿 clientX 当左区总宽，分割条会在
+    // 第一次 move 瞬间向左甩 224px（鼠标"突然漂移"），须补回让位宽度。
+    const collapsedOffset = leftCollapsed ? LIST_COLUMN_WIDTH : 0;
     const onMove = (event: MouseEvent) => {
       const vw = window.innerWidth || 1;
-      const next = Math.max(SPLIT_MIN, Math.min(SPLIT_MAX, event.clientX));
+      const next = Math.max(
+        SPLIT_MIN,
+        Math.min(SPLIT_MAX, event.clientX + collapsedOffset)
+      );
       setLeftRatio(next / vw);
     };
     const onUp = () => setDragging(false);
@@ -749,7 +758,7 @@ function KnowledgeWorkspace() {
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousSelect;
     };
-  }, [dragging]);
+  }, [dragging, leftCollapsed]);
 
   // 占比变化即时持久化；回到默认（null）时清掉记录
   useEffect(() => {
@@ -917,15 +926,59 @@ function KnowledgeWorkspace() {
   };
 
   const handleOpenFile = (file: KnowledgeFile) => {
-    cacheKnowledgeFileView({
+    openFilePreview({
+      fileId: file.file_id,
       file,
-      knowledgeBaseName: selectedKb?.knowledge_base_name,
+      kbName: selectedKb?.knowledge_base_name,
     });
-    window.open(
-      `/knowledge/file/${encodeURIComponent(file.file_id)}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
+  };
+
+  /** 移动/排序文件（桌面与移动端共用）：目标文件夹 + before 落位 */
+  const handleMoveFileToFolder = async (
+    file: KnowledgeFile,
+    targetFolderId: string | null,
+    beforeFileId?: string | null
+  ) => {
+    try {
+      setIsBusy("move");
+      await moveFile(file.file_id, targetFolderId, beforeFileId);
+      // 文件一定属于当前浏览的库（面板只展示它），按归属刷新
+      await loadKnowledgeBaseWorkspace(
+        file.knowledge_base_id || selectedKbId
+      );
+      setNotice(`文件「${file.file_name}」已移动。`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `移动失败：${error.message}` : "移动失败"
+      );
+    } finally {
+      setIsBusy(null);
+    }
+  };
+
+  /** 移动/排序文件夹：目标父 + before 落位 */
+  const handleMoveFolder = async (
+    folder: FolderInfo,
+    targetParentId: string | null,
+    beforeFolderId?: string | null
+  ) => {
+    try {
+      setIsBusy("move");
+      await moveFolder(folder.folder_id, {
+        target_parent_folder_id: targetParentId,
+        before_folder_id: beforeFolderId ?? null,
+      });
+      await loadKnowledgeBaseWorkspace(
+        folder.knowledge_base_id || selectedKbId
+      );
+      setNotice(`文件夹「${folder.folder_name}」已移动。`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `移动失败：${error.message}` : "移动失败"
+      );
+    } finally {
+      setIsBusy(null);
+    }
   };
 
   const handleRetryFile = async (file: KnowledgeFile) => {
@@ -1182,23 +1235,8 @@ function KnowledgeWorkspace() {
               onDeleteFolder={handleDeleteFolder}
               onDeleteFile={handleDeleteFile}
               onRetryFile={handleRetryFile}
-              onMoveFileToFolder={async (file, targetFolderId) => {
-                try {
-                  setIsBusy("move");
-                  await moveFile(file.file_id, targetFolderId);
-                  // 文件一定属于当前浏览的库（面板只展示它），按归属刷新
-                  await loadKnowledgeBaseWorkspace(
-                    file.knowledge_base_id || selectedKbId
-                  );
-                  setNotice(`文件「${file.file_name}」已移动。`);
-                } catch (error) {
-                  setNotice(
-                    error instanceof Error ? `移动失败：${error.message}` : "移动失败"
-                  );
-                } finally {
-                  setIsBusy(null);
-                }
-              }}
+              onMoveFileToFolder={handleMoveFileToFolder}
+              onMoveFolder={handleMoveFolder}
             />
           </div>
         </div>
@@ -1356,22 +1394,8 @@ function KnowledgeWorkspace() {
               onDeleteFolder={handleDeleteFolder}
               onDeleteFile={handleDeleteFile}
               onRetryFile={handleRetryFile}
-              onMoveFileToFolder={async (file, targetFolderId) => {
-                try {
-                  setIsBusy("move");
-                  await moveFile(file.file_id, targetFolderId);
-                  await loadKnowledgeBaseWorkspace(
-                    file.knowledge_base_id || selectedKbId
-                  );
-                  setNotice(`文件「${file.file_name}」已移动。`);
-                } catch (error) {
-                  setNotice(
-                    error instanceof Error ? `移动失败：${error.message}` : "移动失败"
-                  );
-                } finally {
-                  setIsBusy(null);
-                }
-              }}
+              onMoveFileToFolder={handleMoveFileToFolder}
+              onMoveFolder={handleMoveFolder}
             />
           )}
         </div>
@@ -1419,6 +1443,9 @@ function KnowledgeWorkspace() {
           onChanged={(message) => setNotice(message)}
         />
       ) : null}
+
+      {/* 页内文件预览宿主：文件列表点击与对话引用统一走事件打开 */}
+      <FilePreviewHost />
 
       {isBusy ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/10 backdrop-blur-[2px]">

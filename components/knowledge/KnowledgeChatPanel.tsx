@@ -65,6 +65,7 @@ import {
 } from "@/components/chat/UnifiedModelPicker";
 import { ContextIndicator } from "@/components/knowledge/ContextIndicator";
 import { ReportViewer } from "@/components/knowledge/ReportViewer";
+import { openFilePreview } from "@/lib/file-preview";
 import { RecallPathSection } from "@/components/knowledge/RecallFlowChart";
 import { QueryParamsSection } from "@/components/knowledge/QueryParamsPanel";
 import { CitationPreviewMarkdown } from "@/components/knowledge/CitationPreviewMarkdown";
@@ -1668,11 +1669,7 @@ function DocGroup({
 
   const openFile = () => {
     if (!doc.fileId) return;
-    window.open(
-      `/knowledge/file/${encodeURIComponent(doc.fileId)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    openFilePreview({ fileId: doc.fileId });
   };
 
   return (
@@ -1733,14 +1730,10 @@ function DocGroup({
 
             const handleCitationClick = () => {
               if (!canNavigate || !c.file_id) return;
-              const params = new URLSearchParams();
-              params.set("chunkId", c.chunk_id);
-              if (c.chunk_type) params.set("type", c.chunk_type);
-              window.open(
-                `/knowledge/file/${encodeURIComponent(c.file_id)}?${params.toString()}`,
-                "_blank",
-                "noopener,noreferrer",
-              );
+              openFilePreview({
+                fileId: c.file_id,
+                chunkId: c.chunk_id,
+              });
             };
 
             return (
