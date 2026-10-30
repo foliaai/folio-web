@@ -332,7 +332,10 @@ export async function deleteFolder(
 
 export async function moveFolder(
   folderId: string,
-  input: { target_parent_folder_id?: string | null }
+  input: {
+    target_parent_folder_id?: string | null;
+    before_folder_id?: string | null;
+  }
 ): Promise<FolderInfo> {
   return requestJson<FolderInfo>(
     `/api/knowledge/folder/${encodeURIComponent(folderId)}/move`,
@@ -587,13 +590,17 @@ export async function fetchChunkPosition(
 
 export async function moveFile(
   fileId: string,
-  targetFolderId: string | null
+  targetFolderId: string | null,
+  beforeFileId?: string | null
 ): Promise<void> {
   await requestJson<void>(
     `/api/knowledge/file/${encodeURIComponent(fileId)}/move`,
     {
       method: "PUT",
-      body: JSON.stringify({ target_folder_id: targetFolderId }),
+      body: JSON.stringify({
+        target_folder_id: targetFolderId,
+        before_file_id: beforeFileId ?? null,
+      }),
     }
   );
 }

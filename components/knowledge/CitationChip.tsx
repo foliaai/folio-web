@@ -31,6 +31,7 @@ import {
 import { createPortal } from "react-dom";
 import type { Citation } from "@/lib/chat-types";
 import { buildChunkImageRawUrl } from "@/lib/api/knowledge";
+import { openFilePreview } from "@/lib/file-preview";
 import { CitationPreviewMarkdown } from "@/components/knowledge/CitationPreviewMarkdown";
 import { cn } from "@/lib/utils";
 import {
@@ -423,14 +424,7 @@ export function CitationChip({
     e.stopPropagation();
     const fileId = citation?.file_id;
     if (!fileId) return;
-    const chunkId = citation?.chunk_id;
-    const chunkType = citation?.chunk_type;
-    const params = new URLSearchParams();
-    if (chunkId) params.set("chunkId", chunkId);
-    if (chunkType) params.set("type", chunkType);
-    const qs = params.toString();
-    const url = `/knowledge/file/${encodeURIComponent(fileId)}${qs ? "?" + qs : ""}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    openFilePreview({ fileId, chunkId: citation?.chunk_id ?? null });
   };
 
   const popoverEl =
