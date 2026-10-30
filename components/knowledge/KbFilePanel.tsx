@@ -77,7 +77,21 @@ interface KbFilePanelProps {
   onDeleteFolder?: (folder: FolderInfo) => void;
   onDeleteFile?: (file: KnowledgeFile) => void;
   onRetryFile?: (file: KnowledgeFile) => void;
-  onMoveFileToFolder?: (file: KnowledgeFile, targetFolderId: string | null) => void;
+  /**
+   * 移动/排序文件：目标文件夹 + 落位（beforeFileId=null 落末尾）。
+   * 同文件夹传 before 即排序；调用方无需区分两种语义。
+   */
+  onMoveFileToFolder?: (
+    file: KnowledgeFile,
+    targetFolderId: string | null,
+    beforeFileId?: string | null
+  ) => void;
+  /** 移动/排序文件夹：目标父 + 落位（同上语义） */
+  onMoveFolder?: (
+    folder: FolderInfo,
+    targetParentFolderId: string | null,
+    beforeFolderId?: string | null
+  ) => void;
 }
 
 /**
@@ -102,12 +116,23 @@ export const KbFilePanel = ({
   onDeleteFile,
   onRetryFile,
   onMoveFileToFolder,
+  onMoveFolder,
 }: KbFilePanelProps) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>(
     () => readExpandedFolders()
   );
   const [draggingFileId, setDraggingFileId] = useState<string | null>(null);
+  const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  /**
+   * 插位指示线：拖到文件行（文件拖拽）或文件夹行上/下边缘（文件夹拖拽）时
+   * 显示，drop 即按 before 落位。kind 区分行类型，edge 区分上/下沿。
+   */
+  const [dropLine, setDropLine] = useState<{
+    kind: "file" | "folder";
+    targetId: string;
+    edge: "above" | "below";
+  } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -161,11 +186,9 @@ export const KbFilePanel = ({
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
+  // 顺序即接口返回顺序（sort_order + create_time），不再按名称重排——支持手动拖拽排序
   const rootFolders = useMemo(
-    () =>
-      folders
-        .filter((folder) => !folder.parent_folder_id)
-        .sort((a, b) => a.folder_name.localeCompare(b.folder_name)),
+    () => folders.filter((folder) => !folder.parent_folder_id),
     [folders]
   );
 
@@ -177,15 +200,11 @@ export const KbFilePanel = ({
       list.push(folder);
       next.set(folder.parent_folder_id, list);
     });
-    next.forEach((list) => list.sort((a, b) => a.folder_name.localeCompare(b.folder_name)));
     return next;
   }, [folders]);
 
   const rootFiles = useMemo(
-    () =>
-      files
-        .filter((file) => !file.folder_id)
-        .sort((a, b) => a.file_name.localeCompare(b.file_name)),
+    () => files.filter((file) => !file.folder_id),
     [files]
   );
 
@@ -197,7 +216,6 @@ export const KbFilePanel = ({
       list.push(file);
       next.set(file.folder_id, list);
     });
-    next.forEach((list) => list.sort((a, b) => a.file_name.localeCompare(b.file_name)));
     return next;
   }, [files]);
 
@@ -282,14 +300,159 @@ export const KbFilePanel = ({
     [draggingFileId, files]
   );
 
-  /** 本面板只展示一个库，拖拽天然不跨库；仍要求 canMoveFiles 且有落点回调 */
-  const canDrop = Boolean(canMoveFiles && onMoveFileToFolder && draggingFile);
+  const draggingFolder = useMemo(
+    () =>
+      draggingFolderId
+        ? (folders.find((f) => f.folder_id === draggingFolderId) ?? null)
+        : null,
+    [draggingFolderId, folders]
+  );
 
-  const handleDropAt = (targetFolderId: string | null) => {
-    const file = draggingFile;
+  /** 本面板只展示一个库，拖拽天然不跨库；仍要求 canMoveFiles 且有落点回调 */
+  const canDropFile = Boolean(canMoveFiles && onMoveFileToFolder && draggingFile);
+  const canDropFolder = Boolean(canMoveFiles && onMoveFolder && draggingFolder);
+  const canDrop = canDropFile || canDropFolder;
+
+  const clearDragState = () => {
     setDraggingFileId(null);
+    setDraggingFolderId(null);
     setDragOverFolderId(null);
-    if (file) onMoveFileToFolder?.(file, targetFolderId);
+    setDropLine(null);
+  };
+
+  const siblingFoldersOf = (parentId: string | null): FolderInfo[] =>
+    parentId ? (childFoldersByParent.get(parentId) ?? []) : rootFolders;
+
+  const siblingFilesOf = (folderId: string | null): KnowledgeFile[] =>
+    folderId ? (filesByFolder.get(folderId) ?? []) : rootFiles;
+
+  // ---------- 文件拖拽落点 ----------
+
+  /** 落到文件夹行（移入语义）：同文件夹静默，不发请求 */
+  const handleFileDropAtFolder = (targetFolderId: string | null) => {
+    const file = draggingFile;
+    clearDragState();
+    if (!file) return;
+    if ((file.folder_id ?? null) === (targetFolderId ?? null)) return;
+    onMoveFileToFolder?.(file, targetFolderId, null);
+  };
+
+  /** 落到文件行上/下沿（插位语义，含跨文件夹移动+落位） */
+  const handleFileDropAtLine = (targetFile: KnowledgeFile, edge: "above" | "below") => {
+    const file = draggingFile;
+    clearDragState();
+    if (!file || file.file_id === targetFile.file_id) return;
+
+    const siblings = siblingFilesOf(targetFile.folder_id ?? null);
+    const targetIndex = siblings.findIndex((f) => f.file_id === targetFile.file_id);
+    const beforeFileId =
+      edge === "above"
+        ? targetFile.file_id
+        : (siblings[targetIndex + 1]?.file_id ?? null);
+
+    // 位置等价（同文件夹且已在目标位）→ 静默
+    if ((file.folder_id ?? null) === (targetFile.folder_id ?? null)) {
+      const currentIndex = siblings.findIndex((f) => f.file_id === file.file_id);
+      if (beforeFileId === null) {
+        if (currentIndex === siblings.length - 1) return;
+      } else if (currentIndex >= 0) {
+        const beforeIndex = siblings.findIndex((f) => f.file_id === beforeFileId);
+        if (currentIndex === beforeIndex - 1) return;
+      }
+    }
+    onMoveFileToFolder?.(file, targetFile.folder_id ?? null, beforeFileId);
+  };
+
+  // ---------- 文件夹拖拽落点 ----------
+
+  /** 文件夹落到自己或其后代上无效（full_path 前缀判断，与后端校验一致） */
+  const isInvalidFolderTarget = (targetFolderId: string) => {
+    if (!draggingFolder) return true;
+    if (draggingFolder.folder_id === targetFolderId) return true;
+    const target = folders.find((f) => f.folder_id === targetFolderId);
+    if (!target?.full_path || !draggingFolder.full_path) return false;
+    return target.full_path.startsWith(draggingFolder.full_path);
+  };
+
+  /** 落到文件夹行中部（移入语义）：同父静默 */
+  const handleFolderDropAtFolder = (targetFolderId: string) => {
+    const folder = draggingFolder;
+    clearDragState();
+    if (!folder || isInvalidFolderTarget(targetFolderId)) return;
+    if ((folder.parent_folder_id ?? null) === targetFolderId) return;
+    onMoveFolder?.(folder, targetFolderId, null);
+  };
+
+  /** 落到文件夹行上/下沿（插位语义：目标父=目标行所在父） */
+  const handleFolderDropAtLine = (
+    targetFolder: FolderInfo,
+    edge: "above" | "below"
+  ) => {
+    const folder = draggingFolder;
+    clearDragState();
+    if (!folder || folder.folder_id === targetFolder.folder_id) return;
+
+    const parentId = targetFolder.parent_folder_id ?? null;
+    // 插到目标父下，不能插进自己后代（目标行是自己子树内的行时目标父必是自己后代）
+    if (isInvalidFolderTargetEdge(parentId)) return;
+
+    const siblings = siblingFoldersOf(parentId);
+    const targetIndex = siblings.findIndex((f) => f.folder_id === targetFolder.folder_id);
+    const beforeFolderId =
+      edge === "above"
+        ? targetFolder.folder_id
+        : (siblings[targetIndex + 1]?.folder_id ?? null);
+
+    if ((folder.parent_folder_id ?? null) === parentId) {
+      const currentIndex = siblings.findIndex((f) => f.folder_id === folder.folder_id);
+      if (beforeFolderId === null) {
+        if (currentIndex === siblings.length - 1) return;
+      } else if (currentIndex >= 0) {
+        const beforeIndex = siblings.findIndex((f) => f.folder_id === beforeFolderId);
+        if (currentIndex === beforeIndex - 1) return;
+      }
+    }
+    onMoveFolder?.(folder, parentId, beforeFolderId);
+  };
+
+  /** 插位场景的目标父校验：父是自己后代即无效（含父=自己） */
+  const isInvalidFolderTargetEdge = (parentId: string | null) => {
+    if (!draggingFolder) return true;
+    if (parentId === null) return false;
+    return isInvalidFolderTarget(parentId);
+  };
+
+  /** 空白区落点：文件→根目录末尾（已在根且已是末尾则静默）；文件夹→根末尾（同理） */
+  const handleDropAtBlank = () => {
+    if (draggingFile) {
+      const file = draggingFile;
+      clearDragState();
+      if ((file.folder_id ?? null) !== null) {
+        onMoveFileToFolder?.(file, null, null);
+        return;
+      }
+      const siblings = rootFiles;
+      if (siblings[siblings.length - 1]?.file_id === file.file_id) return;
+      onMoveFileToFolder?.(file, null, null);
+      return;
+    }
+    if (draggingFolder) {
+      const folder = draggingFolder;
+      clearDragState();
+      if ((folder.parent_folder_id ?? null) !== null) {
+        onMoveFolder?.(folder, null, null);
+        return;
+      }
+      const siblings = rootFolders;
+      if (siblings[siblings.length - 1]?.folder_id === folder.folder_id) return;
+      onMoveFolder?.(folder, null, null);
+    }
+  };
+
+  /** 指针在行矩形上/下半区的判定（插位指示用） */
+  const edgeOfEvent = (event: React.DragEvent, ratio = 0.5): "above" | "below" => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height * ratio ? "above" : "below";
   };
 
   const renderUploadingPlaceholder = (task: UploadTaskItem, depth: number) => {
@@ -370,30 +533,55 @@ export const KbFilePanel = ({
         key={file.file_id}
         draggable={isDraggable}
         onDragStart={() => setDraggingFileId(file.file_id)}
-        onDragEnd={() => setDraggingFileId(null)}
+        onDragEnd={clearDragState}
+        onDragOver={(event) => {
+          if (!canDropFile) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setDragOverFolderId(null);
+          setDropLine({ kind: "file", targetId: file.file_id, edge: edgeOfEvent(event) });
+        }}
+        onDrop={(event) => {
+          if (!canDropFile) return;
+          event.preventDefault();
+          event.stopPropagation();
+          handleFileDropAtLine(file, dropLine?.targetId === file.file_id ? dropLine.edge : edgeOfEvent(event));
+        }}
         className={cn(
           "group relative flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-gray-100 hover:text-foreground",
           isDraggable && "cursor-grab active:cursor-grabbing",
-          draggingFileId === file.file_id && "opacity-40"
+          draggingFileId === file.file_id && "opacity-40",
+          dropLine?.kind === "file" && dropLine.targetId === file.file_id && "bg-primary/5"
         )}
         style={{ paddingLeft: indentOf(depth) }}
       >
+        {/* 插位指示线：拖到本行上/下沿时显示 */}
+        {dropLine?.kind === "file" && dropLine.targetId === file.file_id ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute left-2 right-2 z-10 h-0.5 rounded-full bg-primary",
+              dropLine.edge === "above" ? "-top-0.5" : "-bottom-0.5"
+            )}
+          />
+        ) : null}
         <FileIcon fileName={file.file_name} className="h-5 w-5 shrink-0" />
-        {/* 上传者/大小/时间走下方 hover 浮层展示；不挂原生 title（黑框与浮层重复） */}
-        <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
-
-        {/* hover 浮出：上传者/大小/上传时间（常驻只显示大小；不挡操作按钮） */}
-        <div className="pointer-events-none absolute right-2 top-[calc(100%-4px)] z-20 hidden items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-muted shadow-md group-hover:flex">
-          {showUploader && file.user_id ? (
-            <span className="max-w-[6rem] truncate font-medium text-foreground">
-              {uploaderProfiles[file.user_id]?.display_name ?? file.user_id} 上传
-            </span>
-          ) : null}
-          <span>{formatBytes(file.file_size)}</span>
-          {file.create_time ? (
-            <span>{file.create_time.replace("T", " ").slice(0, 16)}</span>
-          ) : null}
-        </div>
+        {/* 上传者/上传时间走原生 title：悬停较久才出现，不随鼠标扫过闪现 */}
+        <span
+          className="min-w-0 flex-1 truncate"
+          title={[
+            file.file_name,
+            showUploader && file.user_id
+              ? `上传者：${uploaderProfiles[file.user_id]?.display_name ?? file.user_id}`
+              : null,
+            file.create_time
+              ? `上传时间：${file.create_time.replace("T", " ").slice(0, 16)}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+        >
+          {file.file_name}
+        </span>
 
         {isProcessing || isFailed ? (
           <span
@@ -459,35 +647,83 @@ export const KbFilePanel = ({
       : (expandedFolders[folder.folder_id] ?? false);
     const isDragOver = canDrop && dragOverFolderId === folder.folder_id;
     const isChatTarget = selectedFolderId === folder.folder_id;
+    // 拖文件夹到本行：上/下 25% 边缘=插位线，中部=移入；拖文件到本行恒为移入
+    const showDropLine =
+      dropLine?.kind === "folder" && dropLine.targetId === folder.folder_id;
 
     return (
       <div key={folder.folder_id}>
         <div
+          draggable={canMoveFiles && folder.is_default !== 1}
+          onDragStart={() => setDraggingFolderId(folder.folder_id)}
+          onDragEnd={clearDragState}
           onDragOver={(event) => {
-            if (!canDrop) return;
-            event.preventDefault();
-            event.stopPropagation();
-            setDragOverFolderId(folder.folder_id);
+            if (canDropFile) {
+              event.preventDefault();
+              event.stopPropagation();
+              setDropLine(null);
+              setDragOverFolderId(folder.folder_id);
+              return;
+            }
+            if (canDropFolder) {
+              if (isInvalidFolderTarget(folder.folder_id)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              setDragOverFolderId(null);
+              const edge = edgeOfEvent(event, 0.25);
+              setDropLine({ kind: "folder", targetId: folder.folder_id, edge });
+            }
           }}
           onDragLeave={() => {
             if (dragOverFolderId === folder.folder_id) setDragOverFolderId(null);
+            if (dropLine?.targetId === folder.folder_id) setDropLine(null);
           }}
           onDrop={(event) => {
-            if (!canDrop) return;
-            event.preventDefault();
-            event.stopPropagation();
-            handleDropAt(folder.folder_id);
+            if (canDropFile) {
+              event.preventDefault();
+              event.stopPropagation();
+              handleFileDropAtFolder(folder.folder_id);
+              return;
+            }
+            if (canDropFolder) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (isInvalidFolderTarget(folder.folder_id)) {
+                clearDragState();
+                return;
+              }
+              // 有插位线（边缘区）走插位，否则按中部移入
+              if (showDropLine) {
+                handleFolderDropAtLine(
+                  folder,
+                  dropLine?.edge === "below" ? "below" : "above"
+                );
+              } else {
+                handleFolderDropAtFolder(folder.folder_id);
+              }
+            }
           }}
           className={cn(
-            "group flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors",
+            "group relative flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors",
             isChatTarget
               ? "bg-primary/10 text-foreground"
               : "text-foreground/80 hover:bg-gray-100",
             // 拖拽落点用描边区分，否则与「问答目标」的底色一模一样
-            isDragOver && "bg-primary/10 text-foreground ring-1 ring-inset ring-primary/50"
+            isDragOver && "bg-primary/10 text-foreground ring-1 ring-inset ring-primary/50",
+            draggingFolderId === folder.folder_id && "opacity-40",
+            showDropLine && "bg-primary/5"
           )}
           style={{ paddingLeft: indentOf(depth) }}
         >
+          {/* 插位指示线：拖文件夹到本行上/下沿时显示 */}
+          {showDropLine ? (
+            <div
+              className={cn(
+                "pointer-events-none absolute left-2 right-2 z-10 h-0.5 rounded-full bg-primary",
+                dropLine?.edge === "above" ? "-top-0.5" : "-bottom-0.5"
+              )}
+            />
+          ) : null}
           <button
             type="button"
             onClick={() => toggleFolder(folder.folder_id)}
@@ -704,18 +940,19 @@ export const KbFilePanel = ({
         </div>
       ) : null}
 
-      {/* 拖到空白处＝移回根目录；overflow-x-hidden：内联像素缩进不能撑出横向滚动条 */}
+      {/* 拖到空白处＝落到所在根/列表末尾（文件在根目录时=排到末尾）；overflow-x-hidden：内联像素缩进不能撑出横向滚动条 */}
       <div
         className="flex-1 overflow-y-auto overflow-x-hidden py-1"
         onDragOver={(event) => {
           if (!canDrop) return;
           event.preventDefault();
           setDragOverFolderId(null);
+          setDropLine(null);
         }}
         onDrop={(event) => {
           if (!canDrop) return;
           event.preventDefault();
-          handleDropAt(null);
+          handleDropAtBlank();
         }}
       >
         {rootFolders.map((folder) => renderFolder(folder, 0))}
